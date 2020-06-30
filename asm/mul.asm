@@ -4,13 +4,12 @@
 _start:
 
                 sub             rsp, 2 * 256 * 8
-                lea             rdi, [rsp + 256 * 8]
+		mov             rdi, rsp
                 mov             rcx, 256
                 call            read_long
-                mov             rdi, rsp
+		lea             rdi, [rsp + 256 * 8]
                 call            read_long
                 mov             rbx, rsp
-                lea             rdi, [rdi + 256 * 8]
                 call            mul_long_long
 
                 call            write_long
@@ -88,23 +87,21 @@ mul_long_long:
                 push            r11
                 push            r12
                 mov             r8, rdi
-                mov             r9, rbx                 ; копируем все регистры
+                mov             r9, rbx			; копируем все регистры
         
-                imul            rax, rcx, 8             ; посчитали длину long в rax
-                sub             rsp, rax                ; выделили себе память на первый long - резерв для последующего копирования
+                imul            rax, rcx, 8		; посчитали длину long в rax
+                sub             rsp, rax		; выделили себе память на первый long - резерв для последующего копирования
                 mov             rbx, rsp
-                mov             r10, rsp                ; r10 указывает на первый long, копия первого множителя
-                call            copy_long               ; важны регистры rdi и rbx!!!
-                sub             rsp, rax                ; выделили себе память на второй long - место для mul_long_short, rax больше почти не нужен
-                mov             r11, rsp                ; r11 указывает на второй long
+                mov             r10, rsp		; r10 указывает на первый long, копия первого множителя
+                call            copy_long		; важны регистры rdi и rbx!!!
+                sub             rsp, rax		; выделили себе память на второй long - место для mul_long_short, rax больше почти не нужен
+                mov             r11, rsp		; r11 указывает на второй long
                 mov             rsi, r11		; заранее устанавливаем rsi для add_long_long
-                call            set_zero                ; ОБНУЛЯЕМ первый множитель так же легко, как и...
-                add             r9, rax                 ; поставили r9 за последний qword второго множителя (идём с конца)
+                call            set_zero		; ОБНУЛЯЕМ первый множитель так же легко, как и...
+                add             r9, rax			; поставили r9 за последний qword второго множителя (идём с конца)
                 mov             r12, rcx		; скопировали rcx, чтобы корректно передавать в функции длину
 .loop:
-                mov             rbx, 0x100000000
-		call            mul_long_short
-                call            mul_long_short          ; сместили старый результат на qword
+                call            shift_left          	; сместили старый результат на qword
                 mov             rdi, r10                ; установили rdi на резерв
                 mov             rbx, r11		; копируем первый множитель, для последующего умножения на qword
                 call            copy_long               ; важны регистры rdi и rbx!!!
@@ -160,6 +157,33 @@ mul_long_short:
                 pop             rdi
                 pop             rax
                 ret
+
+; multiplies long number by 2^64
+;    rdi -- address of multiplier #1 (long number)
+;    rcx -- length of long number in qwords
+; result:
+;    product is written to rdi
+shift_left:
+                push            rcx
+		push 		rsi
+                push            rdi
+
+		dec		rcx
+		lea		rdi, [rdi + 8 * rcx]
+.loop:
+		lea		rsi, [rdi - 8]
+		mov		rsi, [rsi]
+                mov             [rdi], rsi
+		lea		rdi, [rdi - 8]
+                dec             rcx
+                jnz             .loop
+
+                pop             rdi
+                pop             rsi
+                pop             rcx
+		mov		QWORD [rdi], 0
+                ret
+
 
 ; divides long number by a short
 ;    rdi -- address of dividend (long number)
