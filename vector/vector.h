@@ -24,14 +24,14 @@ struct vector
     {};
     // O(N) strong
     vector(vector const& other) : vector() {
-        data_ = (other.data_ == nullptr ? nullptr : alloc_data(other.capacity_));
+        data_ = (other.size_ ? alloc_data(other.size_) : nullptr);
         size_t count_copied = 0;
         try {
             for (size_t i = 0; i < other.size_; ++i) {
                 new(data_ + i) T(other[i]);
                 ++count_copied;
             }
-            capacity_ = other.capacity_;
+            capacity_ = other.size_;
             size_ = other.size_;
         } catch (...) {
             for (T* i = data_ + count_copied - 1; i != data_ -1; i--) {
@@ -48,8 +48,7 @@ struct vector
     };
     // O(N) nothrow
     ~vector() {
-        for (T* i = data_ + size_ - 1; i != data_ - 1; i--)
-            i->~T();
+        destruct_all();
         operator delete(data_);
     };
 
@@ -126,10 +125,16 @@ struct vector
     };
     // O(N) nothrow
     void clear() {
-        for (T* i = data_ + size_ - 1; i != data_ - 1; i--)
-            i->~T();
+        destruct_all();
         size_ = 0;
     };
+
+    void destruct_all() {
+        if (data_ != nullptr) {
+            for (T *i = data_ + size_ - 1; i != data_ - 1; i--)
+                i->~T();
+        }
+    }
 
     // O(1) nothrow
     void swap(vector& other) {
@@ -172,36 +177,33 @@ struct vector
                 (i-1)->~T();
             }
             new(new_iterator) T(element);
-            ++size_;
-            return new_iterator;
         } else {
             size_t new_capacity = (capacity_ ? capacity_ * UPPER_BOUND : 1);
-            T* new_data = alloc_data(new_capacity);
+            T *new_data = alloc_data(new_capacity);
             size_t count_copied = 0;
             try {
                 size_t i;
-                for (i = 0; i != position; i++) {
+                for (i = 0; i != position; ++i) {
                     new(new_data + i) T(operator[](i));
                     ++count_copied;
                 }
                 new(new_data + i) T(element);
-                for (i += 1; i < size_ + 1; i++) {
+                for (++i; i < size_ + 1; ++i) {
                     new(new_data + i) T(operator[](i - 1));
                     ++count_copied;
                 }
             } catch (...) {
-                for (T* i = new_data + count_copied; i != new_data; i--)
-                    (i-1)->~T();
+                for (T *i = new_data + count_copied; i != new_data; --i)
+                    (i - 1)->~T();
                 throw;
             }
-            for (T* i = data_ + size_ - 1; i != data_ - 1; i--)
-                i->~T();
+            destruct_all();
             operator delete(data_);
             data_ = new_data;
             capacity_ = new_capacity;
-            ++size_;
-            return data_ + position;
         }
+        ++size_;
+        return data_ + position;
     };
 
     // O(N) weak
@@ -222,12 +224,14 @@ struct vector
         size_t count_delete = last - first;
         size_t new_size = size_ - count_delete;
         assert(count_delete <= size_);
-        if (new_size > capacity_ / LOWER_BOUND) {
-            for (auto* i = const_cast<iterator>(last), *j = const_cast<iterator>(first); i != end(); ++i, ++j) {
-                j->~T();
-                new(j) T(*i);
+        if (new_size >= capacity_ / LOWER_BOUND) {
+            for (auto *i = const_cast<iterator>(first); i != const_cast<iterator>(last); ++i) {
+                i->~T();
             }
-            (end() - 1)->~T();
+            for (auto* i = const_cast<iterator>(last), *j = const_cast<iterator>(first); i != end(); ++i, ++j) {
+                new(j) T(*i);
+                i->~T();
+            }
         } else {
             size_t new_capacity = new_size * UPPER_BOUND;
             T* new_data = alloc_data(new_capacity);
@@ -247,8 +251,7 @@ struct vector
                     (i-1)->~T();
                 throw;
             }
-            for (T* i = data_ + size_ - 1; i != data_ - 1; i--)
-                i->~T();
+            destruct_all();
             operator delete(data_);
             data_ = new_data;
             capacity_ = new_capacity;
@@ -277,9 +280,7 @@ private:
                 (i-1)->~T();
             throw;
         }
-        for (T* i = data_ + size_ - 1; i != data_ - 1; --i) {
-            i->~T();
-        }
+        destruct_all();
         operator delete(data_);
         data_ = new_data;
         capacity_ = new_capacity;
@@ -287,7 +288,11 @@ private:
     };
 
     T* alloc_data (size_t count) {
-        return reinterpret_cast<T*>(operator new(count * sizeof(T)));
+        if (count) {
+            return reinterpret_cast<T *>(operator new(count * sizeof(T)));
+        } else {
+            return nullptr;
+        }
     }
 
 private:
