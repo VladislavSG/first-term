@@ -37,6 +37,8 @@ struct vector
             for (T* i = data_ + count_copied - 1; i != data_ -1; i--) {
                 i->~T();
             }
+            operator delete(data_);
+            data_ = nullptr;
             throw;
         }
     };
@@ -195,6 +197,7 @@ struct vector
             } catch (...) {
                 for (T *i = new_data + count_copied; i != new_data; --i)
                     (i - 1)->~T();
+                operator delete(new_data);
                 throw;
             }
             destruct_all();
@@ -249,6 +252,7 @@ struct vector
             } catch (...) {
                 for (T* i = new_data + count_copied; i != new_data; i--)
                     (i-1)->~T();
+                operator delete(new_data);
                 throw;
             }
             destruct_all();
@@ -278,6 +282,7 @@ private:
         } catch(...) {
             for (T* i = new_data + count_copied; i != new_data; i--)
                 (i-1)->~T();
+            operator delete(new_data);
             throw;
         }
         destruct_all();
