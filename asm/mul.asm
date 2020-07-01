@@ -3,11 +3,12 @@
                 global          _start
 _start:
 
-                sub             rsp, 2 * 256 * 8
+                sub             rsp, (LSIZE + MSIZE) * 8
 		mov             rdi, rsp
-                mov             rcx, 256
+                mov             rcx, LSIZE
                 call            read_long
-		lea             rdi, [rsp + 256 * 8]
+		lea             rdi, [rsp + LSIZE * 8]
+		mov             rcx, MSIZE
                 call            read_long
                 mov             rbx, rsp
                 call            mul_long_long
@@ -20,26 +21,33 @@ _start:
                 jmp             exit
 
 ; adds two long number
-;    rdi -- address of summand #1 (long number)
+;    rdi -- address of summand #1 (accumulator) 
 ;    rsi -- address of summand #2 (long number)
-;    rcx -- length of long numbers in qwords
+;    rcx -- length of long second number in qwords
 ; result:
 ;    sum is written to rdi
-add_long_long:
+accumulate_mul:
                 push            rdi
                 push            rsi
                 push            rcx
                 push            rax
+		push		r8
 
+		mov 		r8, rcx
                 clc
-.loop:
+.loop1:
                 mov             rax, [rsi]
                 lea             rsi, [rsi + 8]
                 adc             [rdi], rax
                 lea             rdi, [rdi + 8]
-                dec             rcx
-                jnz             .loop
-
+                dec             r8
+                jnz             .loop1
+		
+		jnc		.skip			; jump if not carry. Carry флаг меняет только операция adc
+		mov 		rax, 1
+		call 		add_long_short
+.skip:							; пропуск прибавления бита переноса, если его не возникло
+		pop		r8
                 pop             rax
                 pop             rcx
                 pop             rsi
@@ -73,9 +81,9 @@ add_long_short:
                 ret
 
 ; multiplies two long number by stolbik
-;    rdi -- address of multiplier #1 (long number)
-;    rbx -- multiplier #2 (long number)
-;    rcx -- length of long number in qwords
+;    rdi -- address of multiplier #1 (128(256) long number)
+;    rbx -- multiplier #2 (128 long number)   
+;    rcx -- length of long number in qwords           
 ; result:
 ;    product is written to rdi
 mul_long_long:
@@ -85,40 +93,44 @@ mul_long_long:
                 push            r9
                 push            r10
                 push            r11
-                push            r12
                 mov             r8, rdi
                 mov             r9, rbx			; копируем все регистры
         
-                imul            rax, rcx, 8		; посчитали длину long в rax
+                mov             rax, rcx
+		shl		rax, 3			; посчитали длину long в rax
                 sub             rsp, rax		; выделили себе память на первый long - резерв для последующего копирования
                 mov             rbx, rsp
                 mov             r10, rsp		; r10 указывает на первый long, копия первого множителя
                 call            copy_long		; важны регистры rdi и rbx!!!
                 sub             rsp, rax		; выделили себе память на второй long - место для mul_long_short, rax больше почти не нужен
                 mov             r11, rsp		; r11 указывает на второй long
-                mov             rsi, r11		; заранее устанавливаем rsi для add_long_long
+                mov             rsi, rsp		; заранее устанавливаем rsi для add_long_long
+		shl		rcx, 1			; умножаем на 2, чтобы получить MSIZE
                 call            set_zero		; ОБНУЛЯЕМ первый множитель так же легко, как и...
                 add             r9, rax			; поставили r9 за последний qword второго множителя (идём с конца)
-                mov             r12, rcx		; скопировали rcx, чтобы корректно передавать в функции длину
+		shr		rax, 3			; в rax LSIZE (значение rcx в начале)
+		
 .loop:
                 call            shift_left          	; сместили старый результат на qword
                 mov             rdi, r10                ; установили rdi на резерв
                 mov             rbx, r11		; копируем первый множитель, для последующего умножения на qword
+		shr		rcx, 1			; в rcx LSIZE
                 call            copy_long               ; важны регистры rdi и rbx!!!
                 mov             rdi, r11
                 lea             r9, [r9 - 8]            ; сместили r9 на предыдущий qword
                 mov             rbx, [r9]
                 call            mul_long_short          ; посчитали умножение на следующий qword второго множителя
                 mov             rdi, r8                 ; вернули rdi на свое изначальное место (будущий ответ)
-                call            add_long_long           ; прибавили к результату
-                dec             r12
+                call            accumulate_mul          ; прибавили к результату
+		shl		rcx, 1			; в rcx MSIZE
+                dec             rax
                 jnz             .loop
                 
                 mov             rbx, r9			; после цикла r9 указывает на начало второго множителя
-                add             rax, rax
-                add             rsp, rax		; "очистили" стек
-                pop             r12			; вернули обратно все использованные регистры
-                pop             r11
+		shl		rcx, 3
+                add             rsp, rcx		; "очистили" стек
+		shr		rcx, 4			; вернули в исходное состояние
+                pop             r11			; вернули обратно все использованные регистры
                 pop             r10
                 pop             r9
                 pop             r8
@@ -416,3 +428,7 @@ print_string:
 invalid_char_msg:
                 db              "Invalid character: "
 invalid_char_msg_size: equ             $ - invalid_char_msg
+		
+LSIZE:		equ		QWORD 128			; размер long
+MSIZE:		equ		LSIZE * 2		; размер результата операции mul_long_long
+		
