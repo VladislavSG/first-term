@@ -25,7 +25,7 @@ struct vector
 
     // O(N) strong
     vector(vector const& other) : vector() {
-        data_ = (other.size_ ? alloc_data(other.size_) : nullptr);
+        data_ = alloc_data(other.size_);
         save_copy(other.data_, data_, 0, other.size_);
         capacity_ = other.size_;
         size_ = other.size_;
@@ -162,12 +162,11 @@ struct vector
     iterator insert(const_iterator it, T const& element) {
         size_t position = it - data_;
         if (size_ != capacity_) {
-            auto new_iterator = const_cast<iterator>(it);
-            for (iterator i = data_ + size_; i != new_iterator; i--) {
-                new(i) T(*(i-1));
-                (i-1)->~T();
+            T bubble(element);
+            for (size_t i = position; i != size_; ++i) {
+                std::swap(bubble, data_[i]);
             }
-            new(new_iterator) T(element);
+            new(data_ + size_) T(bubble);
         } else {
             size_t new_capacity = (capacity_ ? capacity_ * UPPER_BOUND : 1);
             T *new_data = alloc_data(new_capacity);
@@ -199,21 +198,28 @@ struct vector
     // O(N) weak
     iterator erase(const_iterator first, const_iterator last) {
         size_t count_delete = last - first;
-        size_t new_size = size_ - count_delete;
-        size_t left_count = first - data_;
-        size_t right_count = data_ + size_ - last;
-        assert(count_delete <= size_);
-        size_t new_capacity = (new_size ? new_size * UPPER_BOUND : capacity_);
-        T* new_data = alloc_data(new_capacity);
+        if (count_delete) {
+            size_t new_size = size_ - count_delete;
+            size_t left_count = first - data_;
+            size_t right_count = data_ + size_ - last;
+            assert(count_delete <= size_);
 
-        save_copy(data_, new_data, 0, left_count);
-        save_copy(data_ + left_count + count_delete, new_data, left_count, right_count);
+            if (right_count == 0 && new_size >= capacity_ / LOWER_BOUND) {
+                destruct_all(data_ + left_count, count_delete);
+            } else {
+                size_t new_capacity = new_size * UPPER_BOUND;           // not a zero
+                T *new_data = alloc_data(new_capacity);
 
-        destruct_all();
-        operator delete(data_);
-        data_ = new_data;
-        capacity_ = new_capacity;
-        size_ = new_size;
+                save_copy(data_, new_data, 0, left_count);
+                save_copy(data_ + left_count + count_delete, new_data, left_count, right_count);
+
+                destruct_all();
+                operator delete(data_);
+                data_ = new_data;
+                capacity_ = new_capacity;
+            }
+            size_ = new_size;
+        }
         return const_cast<iterator>(first);
     }
 
@@ -248,7 +254,7 @@ private:
                 ++count_copied;
             }
         } catch(...) {
-            destruct_all(to, count_copied);
+            destruct_all(to, to_start + count_copied);
             operator delete(to);
             to = nullptr;
             throw;
