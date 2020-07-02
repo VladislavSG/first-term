@@ -25,22 +25,9 @@ struct vector
     // O(N) strong
     vector(vector const& other) : vector() {
         data_ = (other.size_ ? alloc_data(other.size_) : nullptr);
-        size_t count_copied = 0;
-        try {
-            for (size_t i = 0; i < other.size_; ++i) {
-                new(data_ + i) T(other[i]);
-                ++count_copied;
-            }
-            capacity_ = other.size_;
-            size_ = other.size_;
-        } catch (...) {
-            for (T* i = data_ + count_copied - 1; i != data_ -1; i--) {
-                i->~T();
-            }
-            operator delete(data_);
-            data_ = nullptr;
-            throw;
-        }
+        save_copy(other.data_, data_, 0, other.size_);
+        capacity_ = other.size_;
+        size_ = other.size_;
     };
     // O(N) strong
     vector& operator=(vector const& other) {
@@ -120,9 +107,7 @@ struct vector
     };
     // O(N) strong
     void shrink_to_fit() {
-        if (size_ == 0)
-            data_ = nullptr;
-        else if (size_ != capacity_)
+        if (size_ != capacity_)
             new_buffer(size_);
     };
     // O(N) nothrow
@@ -182,24 +167,18 @@ struct vector
         } else {
             size_t new_capacity = (capacity_ ? capacity_ * UPPER_BOUND : 1);
             T *new_data = alloc_data(new_capacity);
-            size_t count_copied = 0;
+
+            save_copy(data_, new_data, 0, position);
             try {
-                size_t i;
-                for (i = 0; i != position; ++i) {
-                    new(new_data + i) T(operator[](i));
-                    ++count_copied;
-                }
-                new(new_data + i) T(element);
-                for (++i; i < size_ + 1; ++i) {
-                    new(new_data + i) T(operator[](i - 1));
-                    ++count_copied;
-                }
+                new(new_data + position) T(element);
             } catch (...) {
-                for (T *i = new_data + count_copied; i != new_data; --i)
-                    (i - 1)->~T();
+                for (T *i = new_data + position; i != new_data - 1; --i)
+                    i->~T();
                 operator delete(new_data);
                 throw;
             }
+            save_copy(data_ + position, new_data, position + 1, size_ - position);
+
             destruct_all();
             operator delete(data_);
             data_ = new_data;
@@ -226,6 +205,8 @@ struct vector
     iterator erase(const_iterator first, const_iterator last) {
         size_t count_delete = last - first;
         size_t new_size = size_ - count_delete;
+        size_t left_count = first - begin();
+        size_t right_count = end() - last;
         assert(count_delete <= size_);
         if (new_size >= capacity_ / LOWER_BOUND) {
             for (auto *i = const_cast<iterator>(first); i != const_cast<iterator>(last); ++i) {
@@ -238,23 +219,10 @@ struct vector
         } else {
             size_t new_capacity = new_size * UPPER_BOUND;
             T* new_data = alloc_data(new_capacity);
-            size_t count_copied = 0;
-            try {
-                size_t i;
-                for (i = 0; i < first - begin(); i++) {
-                    new(new_data + i) T(data_[i]);
-                    ++count_copied;
-                }
-                for (i += count_delete; i < size_; i++) {
-                    new(new_data + i - count_delete) T(data_[i]);
-                    ++count_copied;
-                }
-            } catch (...) {
-                for (T* i = new_data + count_copied; i != new_data; i--)
-                    (i-1)->~T();
-                operator delete(new_data);
-                throw;
-            }
+
+            save_copy(data_, new_data, 0, left_count);
+            save_copy(data_ + left_count + count_delete, new_data, left_count, right_count);
+
             destruct_all();
             operator delete(data_);
             data_ = new_data;
@@ -273,24 +241,29 @@ private:
         } else {
             new_size = size_;
         }
-        size_t count_copied = 0;
-        try {
-            for (size_t i = 0; i < new_size; i++) {
-                new(new_data + i) T(data_[i]);
-                ++count_copied;
-            }
-        } catch(...) {
-            for (T* i = new_data + count_copied; i != new_data; i--)
-                (i-1)->~T();
-            operator delete(new_data);
-            throw;
-        }
+        save_copy(data_, new_data, 0, new_size);
         destruct_all();
         operator delete(data_);
         data_ = new_data;
         capacity_ = new_capacity;
         size_ = new_size;
     };
+
+    static void save_copy(T const* from, T * &to, size_t to_start, size_t count) {
+        size_t count_copied = 0;
+        try {
+            for (size_t i = 0; i < count; i++) {
+                new(to + to_start + i) T(from[i]);
+                ++count_copied;
+            }
+        } catch(...) {
+            for (T* i = to + to_start + count_copied - 1; i != to - 1; i--)
+                i->~T();
+            operator delete(to);
+            to = nullptr;
+            throw;
+        }
+    }
 
     T* alloc_data (size_t count) {
         if (count) {
