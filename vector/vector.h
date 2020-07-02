@@ -164,11 +164,6 @@ struct vector
     }
 
     // O(N) weak
-    iterator insert(iterator it, T const& element) {
-        return insert(static_cast<const_iterator>(it), element);
-    }
-
-    // O(N) weak
     iterator insert(const_iterator it, T const& element) {
         size_t position = it - data_;
         if (size_ != capacity_) {
@@ -203,18 +198,8 @@ struct vector
     }
 
     // O(N) weak
-    iterator erase(iterator pos) {
-        return erase(pos, static_cast<T*>(pos) + 1);
-    }
-
-    // O(N) weak
     iterator erase(const_iterator pos) {
-        return erase(pos, static_cast<T const*>(pos) + 1);
-    }
-
-    // O(N) weak
-    iterator erase(iterator first, iterator last) {
-        return erase(static_cast<const_iterator>(first), static_cast<const_iterator>(last));
+        return erase(pos, pos + 1);
     }
 
     // O(N) weak
