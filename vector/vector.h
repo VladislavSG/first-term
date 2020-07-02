@@ -129,11 +129,6 @@ struct vector
         size_ = 0;
     }
 
-    void destruct_all() {
-        for (ptrdiff_t i = size_ - 1; i != -1; i--)
-            data_[i].~T();
-    }
-
     // O(1) nothrow
     void swap(vector& other) {
         using std::swap;
@@ -181,8 +176,7 @@ struct vector
             try {
                 new(new_data + position) T(element);
             } catch (...) {
-                for (ptrdiff_t i = position; i != -1; i--)
-                    new_data[i].~T();
+                destruct_all(new_data, position + 1);
                 operator delete(new_data);
                 throw;
             }
@@ -210,9 +204,7 @@ struct vector
         size_t right_count = data_ + size_ - last;
         assert(count_delete <= size_);
         if (new_size >= capacity_ / LOWER_BOUND) {
-            for (auto *i = const_cast<iterator>(first); i != const_cast<iterator>(last); ++i) {
-                i->~T();
-            }
+            destruct_all(data_ + left_count, count_delete);
             for (auto* i = const_cast<iterator>(last), *j = const_cast<iterator>(first);
                                                         i != data_ + size_; ++i, ++j) {
                 new(j) T(*i);
@@ -251,6 +243,17 @@ private:
         size_ = new_size;
     }
 
+    void destruct_all() {
+        destruct_all(data_, size_);
+    }
+
+    static void destruct_all(T* array, size_t count) {
+        assert(count <= PTRDIFF_MAX);
+
+        for (ptrdiff_t i = count - 1; i != -1; --i)
+            array[i].~T();
+    }
+
     static void save_copy(T const* from, T * &to, size_t to_start, size_t count) {
         size_t count_copied = 0;
         try {
@@ -259,8 +262,7 @@ private:
                 ++count_copied;
             }
         } catch(...) {
-            for (ptrdiff_t i = to_start + count_copied - 1; i != -1; i--)
-                to[i].~T();
+            destruct_all(to, count_copied);
             operator delete(to);
             to = nullptr;
             throw;
