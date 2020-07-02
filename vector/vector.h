@@ -130,10 +130,8 @@ struct vector
     }
 
     void destruct_all() {
-        if (data_ != nullptr) {
-            for (T *i = data_ + size_ - 1; i != data_ - 1; i--)
-                i->~T();
-        }
+        for (ptrdiff_t i = size_ - 1; i != -1; i--)
+            data_[i].~T();
     }
 
     // O(1) nothrow
@@ -188,8 +186,8 @@ struct vector
             try {
                 new(new_data + position) T(element);
             } catch (...) {
-                for (T *i = new_data + position; i != new_data - 1; --i)
-                    i->~T();
+                for (ptrdiff_t i = position; i != -1; i--)
+                    new_data[i].~T();
                 operator delete(new_data);
                 throw;
             }
@@ -276,17 +274,17 @@ private:
                 ++count_copied;
             }
         } catch(...) {
-            for (T* i = to + to_start + count_copied - 1; i != to - 1; i--)
-                i->~T();
+            for (ptrdiff_t i = to_start + count_copied - 1; i != -1; i--)
+                to[i].~T();
             operator delete(to);
             to = nullptr;
             throw;
         }
     }
 
-    T* alloc_data (size_t count) {
+    static T* alloc_data (size_t count) {
         if (count) {
-            return reinterpret_cast<T *>(operator new(count * sizeof(T)));
+            return static_cast<T*>(operator new(count * sizeof(T)));
         } else {
             return nullptr;
         }
