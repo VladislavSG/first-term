@@ -3,14 +3,15 @@
                 global          _start
 _start:
 
-                sub             rsp, (LSIZE + MSIZE) * 8
+                sub             rsp, 4 * LSIZE * 8
 		mov             rdi, rsp
                 mov             rcx, LSIZE
                 call            read_long
 		lea             rdi, [rsp + LSIZE * 8]
-		mov             rcx, MSIZE
                 call            read_long
                 mov             rbx, rsp
+		mov		rsi, rdi
+		lea             rdi, [rdi + LSIZE * 8]
                 call            mul_long_long
 
                 call            write_long
@@ -19,40 +20,6 @@ _start:
                 call            write_char
 
                 jmp             exit
-
-; adds two long number
-;    rdi -- address of summand #1 (accumulator) 
-;    rsi -- address of summand #2 (long number)
-;    rcx -- length of long second number in qwords
-; result:
-;    sum is written to rdi
-accumulate_mul:
-                push            rdi
-                push            rsi
-                push            rcx
-                push            rax
-		push		r8
-
-		mov 		r8, rcx
-                clc
-.loop1:
-                mov             rax, [rsi]
-                lea             rsi, [rsi + 8]
-                adc             [rdi], rax
-                lea             rdi, [rdi + 8]
-                dec             r8
-                jnz             .loop1
-		
-		jnc		.skip			; jump if not carry. Carry флаг меняет только операция adc
-		mov 		rax, 1
-		call 		add_long_short
-.skip:							; пропуск прибавления бита переноса, если его не возникло
-		pop		r8
-                pop             rax
-                pop             rcx
-                pop             rsi
-                pop             rdi
-                ret
 
 ; adds 64-bit number to long number
 ;    rdi -- address of summand #1 (long number)
@@ -80,62 +47,68 @@ add_long_short:
                 pop             rdi
                 ret
 
-; multiplies two long number by stolbik
-;    rdi -- address of multiplier #1 (128(256) long number)
-;    rbx -- multiplier #2 (128 long number)   
+; multiplies two long number by stolbik v2.0
+;    rdi -- address of result
+;    rbx -- address of multiplier #1 (128(256) long number)
+;    rsi -- multiplier #2 (128 long number)   
 ;    rcx -- length of long number in qwords           
 ; result:
-;    product is written to rdi
+;    adress product is written to rdi
+;    rcx - length of result
 mul_long_long:
-                push            rsi
-                push            rax
-                push            r8
-                push            r9
-                push            r10
-                push            r11
-                mov             r8, rdi
-                mov             r9, rbx			; копируем все регистры
-        
-                mov             rax, rcx
-		shl		rax, 3			; посчитали длину long в rax
-                sub             rsp, rax		; выделили себе память на первый long - резерв для последующего копирования
-                mov             rbx, rsp
-                mov             r10, rsp		; r10 указывает на первый long, копия первого множителя
-                call            copy_long		; важны регистры rdi и rbx!!!
-                sub             rsp, rax		; выделили себе память на второй long - место для mul_long_short, rax больше почти не нужен
-                mov             r11, rsp		; r11 указывает на второй long
-                mov             rsi, rsp		; заранее устанавливаем rsi для add_long_long
-		shl		rcx, 1			; умножаем на 2, чтобы получить MSIZE
-                call            set_zero		; ОБНУЛЯЕМ первый множитель так же легко, как и...
-                add             r9, rax			; поставили r9 за последний qword второго множителя (идём с конца)
-		shr		rax, 3			; в rax LSIZE (значение rcx в начале)
-		
-.loop:
-                call            shift_left          	; сместили старый результат на qword
-                mov             rdi, r10                ; установили rdi на резерв
-                mov             rbx, r11		; копируем первый множитель, для последующего умножения на qword
-		shr		rcx, 1			; в rcx LSIZE
-                call            copy_long               ; важны регистры rdi и rbx!!!
-                mov             rdi, r11
-                lea             r9, [r9 - 8]            ; сместили r9 на предыдущий qword
-                mov             rbx, [r9]
-                call            mul_long_short          ; посчитали умножение на следующий qword второго множителя
-                mov             rdi, r8                 ; вернули rdi на свое изначальное место (будущий ответ)
-                call            accumulate_mul          ; прибавили к результату
-		shl		rcx, 1			; в rcx MSIZE
-                dec             rax
-                jnz             .loop
+		push 		rax
+		push		rbx
+		push		rdi
+		push		rsi
+		push		rdx
+		push		r8
+		push 		r9
+		push		r10
+		push		r11
+		push		r12			; сохранили регистры на стеке
                 
-                mov             rbx, r9			; после цикла r9 указывает на начало второго множителя
-		shl		rcx, 3
-                add             rsp, rcx		; "очистили" стек
-		shr		rcx, 4			; вернули в исходное состояние
-                pop             r11			; вернули обратно все использованные регистры
-                pop             r10
-                pop             r9
-                pop             r8
-                pop             rax
-                pop             rsi
+		shl		rcx, 1
+		call 		set_zero
+
+		shr		rcx, 1			
+		mov		r10, rcx		; r10 = LSIZE
+.loop2:
+		clc
+		xor		rdx, rdx		; обнулили разряд переноса
+		mov		r9, rcx			; r9 = LSIZE
+		mov		r12, rdi		; установили "старт" для прибавления в результат
+		mov		r11, rbx		; сбросили адрес разряда первого числа на младший
+.loop1:
+		xor		r8, r8			; бит переноса при сложении
+		add		[r12], rdx		; прибавили разряд переноса, с прошлого умножения
+		adc		r8, 0	
+		mov		rax, [r11]		; прочитали разряд первого множителя
+		mul		QWORD [rsi]		; умножили на разряд второго множителя
+		add		[r12], rax		; прибавили результат произведения двух разрядов с учётом переноса к результату
+		adc		rdx, r8
+		lea		r12, [r12 + 8]
+		lea		r11, [r11 + 8]
+		dec		r9
+		jnz		.loop1
+							; прибавили к результату произведение первого числа на разряд второго
+		adc		[r12], rdx		; прибавили разряд переноса
+		lea		rsi, [rsi + 8]		; сместили разряд второго числа на следующий
+		lea		rdi, [rdi + 8]		; все разряды младше мы уже обработали, поэтому переходим на следующий
+		dec 		r10
+		jnz		.loop2
+	
+		shl		rcx, 1			; установили размер результата 2*LSIZE
+		mov		rdi, rsp		; вернули в rdi адрес начала
+		pop		r12			; вернули остальные регистры в изначальное состояние
+		pop		r11
+		pop		r10
+		pop		r9
+		pop		r8
+		pop		rdx
+		pop		rsi
+		pop		rdi
+		pop		rbx
+		pop		rax
                 ret
 
 
@@ -429,6 +402,4 @@ invalid_char_msg:
                 db              "Invalid character: "
 invalid_char_msg_size: equ             $ - invalid_char_msg
 		
-LSIZE:		equ		QWORD 128			; размер long
-MSIZE:		equ		LSIZE * 2		; размер результата операции mul_long_long
-		
+LSIZE:		equ		QWORD 128		; размер long
