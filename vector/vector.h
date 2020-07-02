@@ -21,100 +21,113 @@ struct vector
         data_(nullptr),
         size_(0),
         capacity_(0)
-    {};
+    {}
+
     // O(N) strong
     vector(vector const& other) : vector() {
         data_ = (other.size_ ? alloc_data(other.size_) : nullptr);
         save_copy(other.data_, data_, 0, other.size_);
         capacity_ = other.size_;
         size_ = other.size_;
-    };
+    }
+
     // O(N) strong
     vector& operator=(vector const& other) {
         vector temp(other);
         swap(temp);
         return *this;
-    };
+    }
+
     // O(N) nothrow
     ~vector() {
         destruct_all();
         operator delete(data_);
-    };
+    }
 
     // O(1) nothrow
     T& operator[](size_t i) {
         return data_[i];
-    };
+    }
+
     // O(1) nothrow
     T const& operator[](size_t i) const {
         return data_[i];
-    };
+    }
 
     // O(1) nothrow
     T* data() {
         return data_;
-    };
+    }
+
     // O(1) nothrow
     T const* data() const {
         return data_;
-    };
+    }
+
     // O(1) nothrow
     size_t size() const {
         return size_;
-    };
+    }
 
     // O(1) nothrow
     T& front() {
         return data_[0];
-    };
+    }
+
     // O(1) nothrow
     T const& front() const {
         return data_[0];
-    };
+    }
 
     // O(1) nothrow
     T& back() {
         return data_[size_ - 1];
-    };
+    }
+
     // O(1) nothrow
     T const& back() const {
         return data_[size_ - 1];
-    };
+    }
+
     // O(1) strong
     void push_back(T const& element) {
-        insert(end(), element);
-    };
+        insert(data_ + size_, element);
+    }
+
     // O(1) nothrow
     void pop_back() {
         assert(size_ != 0);
 
-        erase(end() - 1);
-    };
+        erase(data_ + size_ - 1);
+    }
 
     // O(1) nothrow
     bool empty() const {
         return size_ == 0;
-    };
+    }
 
     // O(1) nothrow
     size_t capacity() const {
         return capacity_;
-    };
+    }
+
     // O(N) strong
     void reserve(size_t n) {
         if (n > capacity_)
             new_buffer(n);
-    };
+    }
+
     // O(N) strong
     void shrink_to_fit() {
         if (size_ != capacity_)
             new_buffer(size_);
-    };
+    }
+
     // O(N) nothrow
     void clear() {
         destruct_all();
         size_ = 0;
-    };
+    }
 
     void destruct_all() {
         if (data_ != nullptr) {
@@ -130,36 +143,39 @@ struct vector
         swap(data_, other.data_);
         swap(size_, other.size_);
         swap(capacity_, other.capacity_);
-    };
+    }
 
     // O(1) nothrow
     iterator begin() {
         return data_;
-    };
+    }
+
     // O(1) nothrow
     iterator end() {
         return data_ + size_;
-    };
+    }
 
     // O(1) nothrow
     const_iterator begin() const {
         return data_;
-    };
+    }
+
     // O(1) nothrow
     const_iterator end() const {
         return data_ + size_;
-    };
+    }
 
     // O(N) weak
     iterator insert(iterator it, T const& element) {
         return insert(static_cast<const_iterator>(it), element);
-    };
+    }
+
     // O(N) weak
     iterator insert(const_iterator it, T const& element) {
-        size_t position = it - begin();
+        size_t position = it - data_;
         if (size_ != capacity_) {
             auto new_iterator = const_cast<iterator>(it);
-            for (iterator i = end(); i != new_iterator; i--) {
+            for (iterator i = data_ + size_; i != new_iterator; i--) {
                 new(i) T(*(i-1));
                 (i-1)->~T();
             }
@@ -186,33 +202,36 @@ struct vector
         }
         ++size_;
         return data_ + position;
-    };
+    }
 
     // O(N) weak
     iterator erase(iterator pos) {
         return erase(pos, static_cast<T*>(pos) + 1);
-    };
+    }
+
     // O(N) weak
     iterator erase(const_iterator pos) {
         return erase(pos, static_cast<T const*>(pos) + 1);
-    };
+    }
 
     // O(N) weak
     iterator erase(iterator first, iterator last) {
         return erase(static_cast<const_iterator>(first), static_cast<const_iterator>(last));
-    };
+    }
+
     // O(N) weak
     iterator erase(const_iterator first, const_iterator last) {
         size_t count_delete = last - first;
         size_t new_size = size_ - count_delete;
-        size_t left_count = first - begin();
-        size_t right_count = end() - last;
+        size_t left_count = first - data_;
+        size_t right_count = data_ + size_ - last;
         assert(count_delete <= size_);
         if (new_size >= capacity_ / LOWER_BOUND) {
             for (auto *i = const_cast<iterator>(first); i != const_cast<iterator>(last); ++i) {
                 i->~T();
             }
-            for (auto* i = const_cast<iterator>(last), *j = const_cast<iterator>(first); i != end(); ++i, ++j) {
+            for (auto* i = const_cast<iterator>(last), *j = const_cast<iterator>(first);
+                                                        i != data_ + size_; ++i, ++j) {
                 new(j) T(*i);
                 i->~T();
             }
@@ -230,7 +249,7 @@ struct vector
         }
         size_ = new_size;
         return const_cast<iterator>(first);
-    };
+    }
 
 private:
     void new_buffer(size_t new_capacity) {
@@ -247,7 +266,7 @@ private:
         data_ = new_data;
         capacity_ = new_capacity;
         size_ = new_size;
-    };
+    }
 
     static void save_copy(T const* from, T * &to, size_t to_start, size_t count) {
         size_t count_copied = 0;
