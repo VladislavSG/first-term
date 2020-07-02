@@ -203,25 +203,16 @@ struct vector
         size_t left_count = first - data_;
         size_t right_count = data_ + size_ - last;
         assert(count_delete <= size_);
-        if (new_size >= capacity_ / LOWER_BOUND) {
-            destruct_all(data_ + left_count, count_delete);
-            for (auto* i = const_cast<iterator>(last), *j = const_cast<iterator>(first);
-                                                        i != data_ + size_; ++i, ++j) {
-                new(j) T(*i);
-                i->~T();
-            }
-        } else {
-            size_t new_capacity = new_size * UPPER_BOUND;
-            T* new_data = alloc_data(new_capacity);
+        size_t new_capacity = (new_size ? new_size * UPPER_BOUND : capacity_);
+        T* new_data = alloc_data(new_capacity);
 
-            save_copy(data_, new_data, 0, left_count);
-            save_copy(data_ + left_count + count_delete, new_data, left_count, right_count);
+        save_copy(data_, new_data, 0, left_count);
+        save_copy(data_ + left_count + count_delete, new_data, left_count, right_count);
 
-            destruct_all();
-            operator delete(data_);
-            data_ = new_data;
-            capacity_ = new_capacity;
-        }
+        destruct_all();
+        operator delete(data_);
+        data_ = new_data;
+        capacity_ = new_capacity;
         size_ = new_size;
         return const_cast<iterator>(first);
     }
@@ -229,12 +220,7 @@ struct vector
 private:
     void new_buffer(size_t new_capacity) {
         T* new_data = alloc_data(new_capacity);
-        size_t new_size;
-        if (size_ > new_capacity) {
-            new_size = new_capacity;
-        } else {
-            new_size = size_;
-        }
+        size_t new_size = (size_ > new_capacity ? new_capacity : size_);
         save_copy(data_, new_data, 0, new_size);
         destruct_all();
         operator delete(data_);
