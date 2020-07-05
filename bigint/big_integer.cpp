@@ -16,9 +16,17 @@ big_integer::big_integer(uint32_t x) {
 }
 
 big_integer::big_integer(std::string const& str) : big_integer(0) {
-    for (auto const& c : str) {
-        *this = *this * 10 + (c - '0');
+    size_t i = 0;
+    bool isPositive = true;
+    if (str[0] == '-') {
+        isPositive = false;
+        i = 1;
     }
+    for (;i < str.size(); ++i) {
+        *this = *this * 10 + (str[i] - '0');
+    }
+    if (!isPositive)
+        *this = -*this;
 }
 
 bool isAddOverflow(uint32_t a, uint32_t b) {
