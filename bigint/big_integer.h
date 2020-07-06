@@ -38,8 +38,10 @@ struct big_integer
     big_integer operator--(int);
 
     uint32_t bitCount() const;
-    big_integer abs() const;
+    big_integer& abs();
     bool isPositive() const;
+    big_integer &negate();
+    big_integer &inverse();
 
     friend bool operator==(big_integer const& a, big_integer const& b);
     friend bool operator!=(big_integer const& a, big_integer const& b);
