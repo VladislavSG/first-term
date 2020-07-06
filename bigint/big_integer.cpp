@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <iostream>
 
 big_integer::big_integer() : big_integer(0) {}
 
@@ -59,22 +60,25 @@ big_integer& big_integer::operator-=(big_integer const& rhs) {
 
 big_integer& big_integer::operator*=(big_integer const& rhs) {
     big_integer result;
-    result.digits_.resize(digits_.size() + rhs.digits_.size());
+    bool result_positive = (isPositive() == rhs.isPositive());
+    *this = this->abs();
+    big_integer rhs_abs(rhs.abs());
+    result.digits_.resize(digits_.size() + rhs_abs.digits_.size());
     for (size_t i = 0; i < digits_.size(); i++) {
         uint32_t carry_digit = 0;
-        for (size_t j = 0; j < rhs.digits_.size(); j++) {
-            uint64_t mul2 = static_cast<uint64_t>(digits_[i])*rhs.digits_[j] + carry_digit;
+        for (size_t j = 0; j < rhs_abs.digits_.size(); j++) {
+            uint64_t mul2 = static_cast<uint64_t>(digits_[i])*rhs_abs.digits_[j] + carry_digit;
             uint32_t carry_add_bit = (isAddOverflow(result.digits_[i+j], mul2) ? 1 : 0);
             result.digits_[i+j] += mul2;
             carry_digit = (mul2 >> 32u) + carry_add_bit;
         }
-        if (i + rhs.digits_.size() < result.digits_.size())
-            result.digits_[i + rhs.digits_.size()] += carry_digit;
-        else
-            result.digits_.push_back(carry_digit);
+        result.digits_[i + rhs_abs.digits_.size()] += carry_digit;
     }
     result.trim();
-    *this = result;
+    if (!result_positive)
+        *this = -result;
+    else
+        *this = result;
     return *this;
 }
 
@@ -94,9 +98,10 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
         for (size_t k = digits_.size() - divisor_size + 1; k > 0; --k) {
             uint32_t q = ((static_cast<uint64_t>(getDigit(k + divisor_size - 1)) << 32u) +
                            getDigit(k + divisor_size - 2)) / divisor_back;
-            *this -= ((divisor * q) << ((k - 1) * 8 * sizeof(uint32_t)));
+            big_integer temp_divisor = (divisor << ((k - 1) * 8 * sizeof(uint32_t)));
+            *this -= temp_divisor * q;
             while (!isPositive()) {
-                *this += divisor;
+                *this += temp_divisor;
                 --q;
             }
             result.digits_[k-1] = q;
@@ -117,27 +122,33 @@ big_integer& big_integer::operator%=(big_integer const& rhs) {
 }
 
 big_integer& big_integer::operator&=(big_integer const& rhs) {
+    size_t max_size = (rhs.digits_.size() > digits_.size() ? rhs.digits_.size() : digits_.size());
     reserve(rhs.digits_.size());
-    for (size_t i = 0; i < rhs.digits_.size(); ++i) {
-        digits_[i] &= rhs.digits_[i];
+    for (size_t i = 0; i < max_size; ++i) {
+        digits_[i] &= rhs.getDigit(i);
     }
+    trim();
     return *this;
 }
 
 big_integer& big_integer::operator|=(big_integer const& rhs) {
+    size_t max_size = (rhs.digits_.size() > digits_.size() ? rhs.digits_.size() : digits_.size());
     reserve(rhs.digits_.size());
-    for (size_t i = 0; i < rhs.digits_.size(); ++i) {
-        digits_[i] |= rhs.digits_[i];
+    for (size_t i = 0; i < max_size; ++i) {
+        digits_[i] |= rhs.getDigit(i);
     }
+    trim();
     return *this;
 }
 
 big_integer& big_integer::operator^=(big_integer const& rhs)
 {
+    size_t max_size = (rhs.digits_.size() > digits_.size() ? rhs.digits_.size() : digits_.size());
     reserve(rhs.digits_.size());
-    for (size_t i = 0; i < rhs.digits_.size(); ++i) {
-        digits_[i] ^= rhs.digits_[i];
+    for (size_t i = 0; i < max_size; ++i) {
+        digits_[i] ^= rhs.getDigit(i);
     }
+    trim();
     return *this;
 }
 
@@ -148,44 +159,47 @@ big_integer& big_integer::operator<<=(unsigned int rhs) {
     unsigned int bit_count_l = rhs % (8 * sizeof(uint32_t));
     unsigned int bit_count_r =  sizeof(uint32_t) * 8u - bit_count_l;
     size_t new_size = digits_.size() + digit_count + (bit_count_l ? 1 : 0);
-    digits_.resize(new_size);
+    reserve(new_size);
     if (bit_count_l) {
-        for (size_t i = new_size - 1; i > digit_count; --i) {
-            digits_[i] = (digits_[i - digit_count] << bit_count_l) +
-                         (digits_[i - digit_count - 1] >> bit_count_r);
+        for (size_t i = new_size; i > digit_count + 1; --i) {
+            digits_[i - 1] = (getDigit(i - digit_count - 1) << bit_count_l) +
+                         (getDigit(i - digit_count - 2) >> bit_count_r);
         }
+        digits_[digit_count] = (getDigit(0) << bit_count_l);
     } else {
-        for (size_t i = new_size - 1; i > digit_count; --i) {
-            digits_[i] = digits_[i - digit_count];
+        for (size_t i = new_size; i > digit_count; --i) {
+            digits_[i - 1] = digits_[i - digit_count - 1];
         }
     }
-    digits_[digit_count] = (digits_.front() << bit_count_l);
     for (size_t i = 0; i < digit_count; ++i) {
         digits_[i] = 0;
     }
+    trim();
     return *this;
 }
 
 big_integer& big_integer::operator>>=(unsigned int rhs) {
     if (rhs == 0)
         return *this;
+    size_t digit_size = digits_.size();
     unsigned int digit_count = rhs / (8 * sizeof(uint32_t));
     unsigned int bit_count_r = rhs % (8 * sizeof(uint32_t));
     unsigned int bit_count_l = (8 * sizeof(uint32_t)) - bit_count_r;
     size_t i = 0;
-    if (bit_count_l) {
-        for (; i < digits_.size() - digit_count - 1; i++) {
-            digits_[i] = (digits_[i + digit_count] >> bit_count_r) +
-                         (digits_[i + digit_count + 1] << bit_count_l);
+    if (bit_count_r) {
+        for (; i < digit_size - digit_count; ++i) {
+            digits_[i] = (getDigit(i + digit_count) >> bit_count_r) +
+                         (getDigit(i + digit_count + 1) << bit_count_l);
         }
     } else {
-        for (; i < digits_.size() - digit_count - 1; i++) {
-            digits_[i] = digits_[i + digit_count + 1];
+        for (; i < digit_size - digit_count; ++i) {
+            digits_[i] = getDigit(i + digit_count);
         }
     }
-    digits_[i] = (digits_.back() >> bit_count_r);
-    for (++i; i < digits_.size(); ++i)
+
+    for (; i < digit_size; ++i)
          digits_.pop_back();
+    trim();
     return *this;
 }
 
@@ -195,20 +209,16 @@ big_integer big_integer::operator+() const {
 
 big_integer big_integer::operator-() const {
     big_integer r(*this);
-    r.reserve(r.digits_.size() + 1);
-    r = ~r + 1;
-    return r.trim();
+    return r.negate();
 }
 
 big_integer big_integer::operator~() const {
     big_integer r(*this);
-    for (auto &i : r.digits_)
-        i = ~i;
-    return r;
+    return r.inverse();
 }
 
 big_integer& big_integer::operator++() {
-    *this = *this + 1;
+    *this += 1;
     return *this;
 }
 
@@ -219,7 +229,7 @@ big_integer big_integer::operator++(int) {
 }
 
 big_integer& big_integer::operator--() {
-    *this = *this - 1;
+    *this -= 1;
     return *this;
 }
 
@@ -295,10 +305,10 @@ bool operator>(big_integer const& a, big_integer const& b) {
     if (a_bc != b_bc) {
         return (a.isPositive() == (a_bc > b_bc));
     }
-    for (size_t i = 0; i < a.digits_.size() - 1; ++i) {
-        if (a.digits_[i] > b.digits_[i])
+    for (size_t i = a.digits_.size(); i != 0; --i) {
+        if (a.digits_[i-1] > b.digits_[i-1])
             return true;
-        else if (a.digits_[i] < b.digits_[i])
+        else if (a.digits_[i-1] < b.digits_[i-1])
             return false;
     }
     return false;
@@ -312,14 +322,19 @@ bool operator>=(big_integer const& a, big_integer const& b) {
     return !(b > a);
 }
 
+std::string itors(unsigned int &i) {   // integer to reverse string
+
+}
+
 std::string to_string(big_integer const& a) {
     if (a == 0)
         return "0";
+    int const divisor = 1000000000;
     big_integer r = a.abs();
     std::string s;
     while (r > 0) {
-        s.push_back('0' + (r % 10).digits_[0]);
-        r /= 10;
+        s.append(itors((r % divisor).digits_[0]));
+        r /= divisor;
     }
     if (!a.isPositive())
         s.push_back('-');
@@ -354,12 +369,11 @@ big_integer& big_integer::trim() {
     return *this;
 }
 
-big_integer big_integer::abs() const {
-    big_integer r(*this);
-    if (r.isPositive())
-        return r;
+big_integer& big_integer::abs() {
+    if (isPositive())
+        return *this;
     else
-        return -r;
+        return *this->negate();
 }
 
 void big_integer::reserve(size_t new_size) {
@@ -392,4 +406,15 @@ uint32_t big_integer::bitCount(uint32_t d) {
 
 bool big_integer::isPositive(uint32_t x) {
     return (x >> 31u) == 0;
+}
+
+big_integer &big_integer::negate() {
+    reserve(digits_.size() + 1);
+    return ++inverse();
+}
+
+big_integer &big_integer::inverse() {
+    for (auto &i : digits_)
+        i = ~i;
+    return this->trim();
 }
