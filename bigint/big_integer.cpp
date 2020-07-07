@@ -88,28 +88,35 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
     big_integer divisor(rhs.abs());
     big_integer result;
     if (*this >= divisor) {
-        uint32_t divisor_back = (divisor.digits_.back() ? divisor.digits_.back() : divisor.digits_[divisor.digits_.size() - 2]);
+        uint32_t divisor_back;
+        size_t divisor_size = divisor.digits_.size();
+        if (divisor.digits_.back()) {
+            divisor_back = divisor.digits_.back();
+        } else {
+            divisor_back = divisor.digits_[divisor.digits_.size() - 2];
+            --divisor_size;
+        }
         size_t shift = sizeof(uint32_t) * 8 - bitCount(divisor_back);
         divisor <<= shift;
         *this <<= shift;
         divisor_back = divisor.digits_[divisor.digits_.size() - 2];
-        size_t divisor_size = divisor.digits_.size() - 1;
         result.reserve(digits_.size() - divisor_size + 1);
+        divisor <<= ((digits_.size() - divisor_size) * 8 * sizeof(uint32_t));
         for (size_t k = digits_.size() - divisor_size + 1; k > 0; --k) {
             uint32_t q = ((static_cast<uint64_t>(getDigit(k + divisor_size - 1)) << 32u) +
-                           getDigit(k + divisor_size - 2)) / divisor_back;
-            big_integer temp_divisor = (divisor << ((k - 1) * 8 * sizeof(uint32_t)));
-            *this -= temp_divisor * q;
+                          getDigit(k + divisor_size - 2)) / divisor_back;
+            *this -= divisor * q;
             while (!isPositive()) {
-                *this += temp_divisor;
+                *this += divisor;
                 --q;
             }
-            result.digits_[k-1] = q;
+            divisor >>= 8 * sizeof(uint32_t);
+            result.digits_[k - 1] = q;
         }
         result.trim();
+        if (!result_positive)
+            result.negate();
     }
-    if (!result_positive)
-        result.negate();
     *this = result;
     return *this;
 }
