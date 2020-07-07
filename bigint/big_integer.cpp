@@ -59,26 +59,57 @@ big_integer& big_integer::operator-=(big_integer const& rhs) {
     return *this;
 }
 
+big_integer &big_integer::shifted_sub_ip(big_integer const& rhs, size_t pos) {
+    size_t new_size = (digits_.size() > rhs.digits_.size() ? digits_.size() : rhs.digits_.size());
+    reserve(new_size + 1);
+
+    uint32_t carry_bit = 1u;
+    for (size_t i = pos; i < new_size + 1; i++) {
+        uint32_t new_carry_bit;
+        if (isAddOverflow(digits_[i], ~rhs.getDigit(i - pos)) ||
+            isAddOverflow(digits_[i] + ~rhs.getDigit(i - pos), carry_bit))
+            new_carry_bit = 1u;
+        else
+            new_carry_bit = 0u;
+        digits_[i] += ~rhs.getDigit(i - pos) + carry_bit;
+        carry_bit = new_carry_bit;
+    }
+    trim();
+    return *this;
+}
+
+big_integer &big_integer::shifted_sub_abs_ip(big_integer const& rhs, size_t pos) {
+    big_integer temp(rhs);
+    temp.digits_.push_back(0);
+    return shifted_sub_ip(temp, pos);
+}
+
 big_integer& big_integer::operator*=(big_integer const& rhs) {
     big_integer result;
-    bool result_positive = (isPositive() == rhs.isPositive());
-    absInPlace();
-    big_integer rhs_abs(rhs.abs());
-    result.digits_.resize(digits_.size() + rhs_abs.digits_.size());
+    result.digits_.resize(digits_.size() + rhs.digits_.size() + 1);
     for (size_t i = 0; i < digits_.size(); i++) {
         uint32_t carry_digit = 0;
-        for (size_t j = 0; j < rhs_abs.digits_.size(); j++) {
-            uint64_t mul2 = static_cast<uint64_t>(digits_[i])*rhs_abs.digits_[j] + carry_digit;
+        for (size_t j = 0; j < rhs.digits_.size(); j++) {
+            uint64_t mul2 = static_cast<uint64_t>(digits_[i])*rhs.digits_[j] + carry_digit;
             uint32_t carry_add_bit = (isAddOverflow(result.digits_[i+j], mul2) ? 1 : 0);
             result.digits_[i+j] += mul2;
             carry_digit = (mul2 >> 32u) + carry_add_bit;
         }
-        result.digits_[i + rhs_abs.digits_.size()] += carry_digit;
+        result.digits_[i + rhs.digits_.size()] += carry_digit;
     }
+    if (!rhs.isPositive()) {
+        result.shifted_sub_abs_ip(*this, rhs.digits_.size());
+    }
+    if (!isPositive()) {
+        result.shifted_sub_abs_ip(rhs, digits_.size());
+        //big_integer temp = rhs << (digits_.size() * sizeof(uint32_t) * 8);
+        //temp.digits_.push_back(0);
+        //result -= temp;
+    }
+    if (!rhs.isPositive() && !isPositive())
+        result += big_integer(1) <<= ((digits_.size() + rhs.digits_.size()) * sizeof(uint32_t) * 8);
     result.trim();
-    if (!result_positive)
-        result.negate();
-    *this = result;
+    std::swap(*this, result);
     return *this;
 }
 
@@ -117,7 +148,7 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
         if (!result_positive)
             result.negate();
     }
-    *this = result;
+    std::swap(*this, result);
     return *this;
 }
 

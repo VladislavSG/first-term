@@ -44,6 +44,9 @@ struct big_integer
     big_integer &negate();
     big_integer &inverse();
 
+    big_integer& shifted_sub_ip(big_integer const &rhs, size_t pos);
+    big_integer& shifted_sub_abs_ip(big_integer const &rhs, size_t pos);
+
     friend bool operator==(big_integer const& a, big_integer const& b);
     friend bool operator!=(big_integer const& a, big_integer const& b);
     friend bool operator<(big_integer const& a, big_integer const& b);
