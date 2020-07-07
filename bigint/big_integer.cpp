@@ -25,10 +25,10 @@ big_integer::big_integer(std::string const& str) : big_integer(0) {
         i = 1;
     }
     for (;i < str.size(); ++i) {
-        *this = *this * 10 + (str[i] - '0');
+        (*this *= 10) += (str[i] - '0');
     }
     if (!isPositive)
-        *this = -*this;
+        negate();
 }
 
 bool isAddOverflow(uint32_t a, uint32_t b) {
@@ -36,7 +36,7 @@ bool isAddOverflow(uint32_t a, uint32_t b) {
 }
 
 big_integer& big_integer::operator+=(big_integer const& rhs) {
-    size_t new_size = (digits_.size() >= rhs.digits_.size() ? digits_.size() : rhs.digits_.size());
+    size_t new_size = (digits_.size() > rhs.digits_.size() ? digits_.size() : rhs.digits_.size());
     reserve(new_size + 1);
 
     uint32_t carry_bit = 0u;
@@ -62,7 +62,7 @@ big_integer& big_integer::operator-=(big_integer const& rhs) {
 big_integer& big_integer::operator*=(big_integer const& rhs) {
     big_integer result;
     bool result_positive = (isPositive() == rhs.isPositive());
-    *this = this->abs();
+    absInPlace();
     big_integer rhs_abs(rhs.abs());
     result.digits_.resize(digits_.size() + rhs_abs.digits_.size());
     for (size_t i = 0; i < digits_.size(); i++) {
@@ -77,15 +77,14 @@ big_integer& big_integer::operator*=(big_integer const& rhs) {
     }
     result.trim();
     if (!result_positive)
-        *this = -result;
-    else
-        *this = result;
+        result.negate();
+    *this = result;
     return *this;
 }
 
 big_integer& big_integer::operator/=(big_integer const& rhs) {
     bool result_positive = (isPositive() == rhs.isPositive());
-    *this = abs();
+    absInPlace();
     big_integer divisor(rhs.abs());
     big_integer result;
     if (*this >= divisor) {
@@ -110,7 +109,7 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
         result.trim();
     }
     if (!result_positive)
-        result = -result;
+        result.negate();
     *this = result;
     return *this;
 }
