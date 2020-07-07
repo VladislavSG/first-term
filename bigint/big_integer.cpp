@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <iostream>
+#include <sstream>
 
 big_integer::big_integer() : big_integer(0) {}
 
@@ -322,26 +323,27 @@ bool operator>=(big_integer const& a, big_integer const& b) {
     return !(b > a);
 }
 
-std::string itors(unsigned int &i) {   // integer to reverse string
-
-}
-
 std::string to_string(big_integer const& a) {
     if (a == 0)
         return "0";
     int const divisor = 1000000000;
+    std::vector<uint32_t> buffer;
+    std::stringstream s;
     big_integer r = a.abs();
-    std::string s;
     while (r > 0) {
-        s.append(itors((r % divisor).digits_[0]));
+        buffer.push_back((r % divisor).digits_[0]);
         r /= divisor;
     }
+
     if (!a.isPositive())
-        s.push_back('-');
-    for (size_t i = 0; i < s.size()/2; ++i) {
-        std::swap(s[i], s[s.size() - i - 1]);
+        s << "-";
+    s << buffer.back();
+    for (size_t i = buffer.size() - 1; i > 0; --i) {
+        char nine[10];
+        sprintf(nine, "%09d", buffer[i-1]);
+        s << nine;
     }
-    return s;
+    return s.str();
 }
 
 std::ostream& operator<<(std::ostream& s, big_integer const& a) {
@@ -369,11 +371,13 @@ big_integer& big_integer::trim() {
     return *this;
 }
 
-big_integer& big_integer::abs() {
+
+
+big_integer& big_integer::absInPlace() {
     if (isPositive())
         return *this;
     else
-        return *this->negate();
+        return this->negate();
 }
 
 void big_integer::reserve(size_t new_size) {
@@ -410,11 +414,17 @@ bool big_integer::isPositive(uint32_t x) {
 
 big_integer &big_integer::negate() {
     reserve(digits_.size() + 1);
-    return ++inverse();
+    ++inverse();
+    return trim();
 }
 
 big_integer &big_integer::inverse() {
     for (auto &i : digits_)
         i = ~i;
     return this->trim();
+}
+
+big_integer big_integer::abs() const {
+    big_integer r(*this);
+    return r.absInPlace();
 }
