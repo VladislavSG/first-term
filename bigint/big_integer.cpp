@@ -98,13 +98,16 @@ big_integer& big_integer::operator*=(big_integer const& rhs) {
         result.digits_[i + rhs.digits_.size()] += carry_digit;
     }
     if (!rhs.isPositive()) {
-        result.shifted_sub_abs_ip(*this, rhs.digits_.size());
+        //result.shifted_sub_abs_ip(*this, rhs.digits_.size());
+        big_integer temp = *this << (rhs.digits_.size() * sizeof(uint32_t) * 8);
+        temp.digits_.push_back(0);
+        result -= temp;
     }
     if (!isPositive()) {
-        result.shifted_sub_abs_ip(rhs, digits_.size());
-        //big_integer temp = rhs << (digits_.size() * sizeof(uint32_t) * 8);
-        //temp.digits_.push_back(0);
-        //result -= temp;
+        //result.shifted_sub_abs_ip(rhs, digits_.size());
+        big_integer temp = rhs << (digits_.size() * sizeof(uint32_t) * 8);
+        temp.digits_.push_back(0);
+        result -= temp;
     }
     if (!rhs.isPositive() && !isPositive())
         result += big_integer(1) <<= ((digits_.size() + rhs.digits_.size()) * sizeof(uint32_t) * 8);
@@ -112,6 +115,8 @@ big_integer& big_integer::operator*=(big_integer const& rhs) {
     std::swap(*this, result);
     return *this;
 }
+
+
 
 big_integer& big_integer::operator/=(big_integer const& rhs) {
     bool result_positive = (isPositive() == rhs.isPositive());
@@ -132,16 +137,14 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
         *this <<= shift;
         divisor_back = divisor.digits_[divisor.digits_.size() - 2];
         result.reserve(digits_.size() - divisor_size + 1);
-        divisor <<= ((digits_.size() - divisor_size) * 8 * sizeof(uint32_t));
         for (size_t k = digits_.size() - divisor_size + 1; k > 0; --k) {
             uint32_t q = ((static_cast<uint64_t>(getDigit(k + divisor_size - 1)) << 32u) +
                           getDigit(k + divisor_size - 2)) / divisor_back;
-            *this -= divisor * q;
+            shifted_sub_ip(divisor * q, k - 1);
             while (!isPositive()) {
-                *this += divisor;
+                *this += divisor << ((k-1) * 8 * sizeof(uint32_t));
                 --q;
             }
-            divisor >>= 8 * sizeof(uint32_t);
             result.digits_[k - 1] = q;
         }
         result.trim();
