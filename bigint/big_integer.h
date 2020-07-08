@@ -4,6 +4,8 @@
 #include <vector>
 #include <functional>
 
+using storage_t = std::vector<uint32_t>;
+
 struct big_integer
 {
     big_integer();
@@ -40,13 +42,13 @@ struct big_integer
 
     big_integer abs() const;
     bool isPositive() const;
-    big_integer& negateIp();
-    big_integer& inverseIp();
+    big_integer& negateInPlace();
+    big_integer& inverseInPlace();
     big_integer& absInPlace();
 
-    big_integer& shiftedSubIp(big_integer const&, size_t);
-    big_integer& shiftedAddIp(big_integer const&, size_t);
-    big_integer& divAbsLongDigitIp(uint32_t x);
+    big_integer& shiftedSubInPlace(big_integer const&, size_t);
+    big_integer& shiftedAddInPlace(big_integer const&, size_t);
+    big_integer& divAbsLongDigitInPlace(uint32_t x);
 
     friend bool operator==(big_integer const&, big_integer const&);
     friend bool operator!=(big_integer const&, big_integer const&);
@@ -58,15 +60,16 @@ struct big_integer
     friend std::string to_string(big_integer const&);
 
 private:
-    std::vector<uint32_t> digits_{}; //храним в little endian в дополнительном коде
+    storage_t data_; //храним в little endian в дополнительном коде
     static const size_t BIT_IN_DIGIT = 8 * sizeof(uint32_t);
 
-    big_integer& shiftedAbstIp(big_integer const &, size_t, uint32_t,
-            std::function<uint32_t(uint32_t)> const&);
-    big_integer& shiftedSubVectorIp(big_integer const&, size_t);
+    big_integer& shiftedAbstractInPlace(big_integer const &, size_t, uint32_t,
+                            std::function<uint32_t(uint32_t)> const&, bool);
+    big_integer& shiftedSubVectorInPlace(big_integer const&, size_t);
     big_integer& trim();
     void reserve(size_t);
     uint32_t getDigit(size_t) const;
+    uint32_t getDigit(size_t, bool) const;
 
     static uint32_t bitCount(uint32_t);
     static bool isPositive(uint32_t);
