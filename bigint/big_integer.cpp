@@ -172,35 +172,27 @@ big_integer& big_integer::operator%=(big_integer const& rhs) {
     return *this;
 }
 
-big_integer& big_integer::operator&=(big_integer const& rhs) {
+big_integer& big_integer::bit_operation(big_integer const& rhs, const
+std::function<uint32_t(uint32_t, uint32_t)>& operation) {
     size_t max_size = (rhs.digits_.size() > digits_.size() ? rhs.digits_.size() : digits_.size());
-    reserve(rhs.digits_.size());
+    reserve(max_size);
     for (size_t i = 0; i < max_size; ++i) {
-        digits_[i] &= rhs.getDigit(i);
+        digits_[i] = operation(digits_[i], rhs.getDigit(i));
     }
-    trim();
-    return *this;
+    return trim();
+}
+
+big_integer& big_integer::operator&=(big_integer const& rhs) {
+    return bit_operation(rhs, [](uint32_t a, uint32_t b) { return a & b; });
 }
 
 big_integer& big_integer::operator|=(big_integer const& rhs) {
-    size_t max_size = (rhs.digits_.size() > digits_.size() ? rhs.digits_.size() : digits_.size());
-    reserve(rhs.digits_.size());
-    for (size_t i = 0; i < max_size; ++i) {
-        digits_[i] |= rhs.getDigit(i);
-    }
-    trim();
-    return *this;
+    return bit_operation(rhs, [](uint32_t a, uint32_t b) { return a | b; });
 }
 
 big_integer& big_integer::operator^=(big_integer const& rhs)
 {
-    size_t max_size = (rhs.digits_.size() > digits_.size() ? rhs.digits_.size() : digits_.size());
-    reserve(rhs.digits_.size());
-    for (size_t i = 0; i < max_size; ++i) {
-        digits_[i] ^= rhs.getDigit(i);
-    }
-    trim();
-    return *this;
+    return bit_operation(rhs, [](uint32_t a, uint32_t b) { return a ^ b; });
 }
 
 big_integer& big_integer::operator<<=(unsigned int rhs) {
