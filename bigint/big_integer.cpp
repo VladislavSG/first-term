@@ -1,8 +1,4 @@
 #include "big_integer.h"
-
-#include <cstring>
-#include <stdexcept>
-#include <iostream>
 #include <sstream>
 
 big_integer::big_integer() : big_integer(0) {}
