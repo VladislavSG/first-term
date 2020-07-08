@@ -312,11 +312,7 @@ bool operator==(big_integer const& a, big_integer const& b) {
     if (a.isPositive() != b.isPositive() || a.digits_.size() != b.digits_.size()) {
         return false;
     }
-    for (size_t i = 0; i < a.digits_.size(); ++i) {
-        if (a.digits_[i] != b.digits_[i])
-            return false;
-    }
-    return true;
+    return std::equal(a.digits_.begin(), a.digits_.end(), b.digits_.begin());
 }
 
 bool operator!=(big_integer const& a, big_integer const& b) {
