@@ -13,7 +13,7 @@ big_integer::big_integer(int x) {
 
 big_integer::big_integer(uint32_t x) {
     digits_.push_back(x);
-    if (!isPositive())
+    if (!is_positive())
         digits_.push_back(0);
 }
 
@@ -86,30 +86,46 @@ big_integer& big_integer::operator*=(big_integer const& rhs) {
         }
         result.digits_[i + rhs.digits_.size()] += carry_digit;
     }
-    if (!rhs.isPositive()) {
+    if (!rhs.is_positive()) {
         //result.shifted_sub_abs_ip(*this, rhs.digits_.size());
         big_integer temp = *this << (rhs.digits_.size() * sizeof(uint32_t) * 8);
         temp.digits_.push_back(0);
         result -= temp;
     }
-    if (!isPositive()) {
+    if (!is_positive()) {
         //result.shifted_sub_abs_ip(rhs, digits_.size());
         big_integer temp = rhs << (digits_.size() * sizeof(uint32_t) * 8);
         temp.digits_.push_back(0);
         result -= temp;
     }
-    if (!rhs.isPositive() && !isPositive())
+    if (!rhs.is_positive() && !is_positive())
         result += big_integer(1) <<= ((digits_.size() + rhs.digits_.size()) * sizeof(uint32_t) * 8);
     result.trim();
     std::swap(*this, result);
     return *this;
 }
 
-
+big_integer& big_integer::div_long_digit(uint32_t x) {
+    uint64_t carry = 0;
+    abs_in_place();
+    for (size_t i = digits_.size(); i > 0; i--) {
+        uint64_t cur_val = digits_[i - 1] + (carry << 32u);
+        digits_[i - 1] = static_cast<uint32_t>(cur_val / x);
+        carry = cur_val % x;
+    }
+    return trim();
+}
 
 big_integer& big_integer::operator/=(big_integer const& rhs) {
-    bool result_positive = (isPositive() == rhs.isPositive());
-    absInPlace();
+    if (rhs.digits_.size() == 1 || (rhs.digits_.size() == 2 && rhs.digits_.back() == 0)) {
+        bool p = is_positive() == rhs.is_positive();
+        div_long_digit(rhs.abs().digits_[0]);
+        if (!p)
+            negate();
+        return *this;
+    }
+    bool result_positive = (is_positive() == rhs.is_positive());
+    abs_in_place();
     big_integer divisor(rhs.abs());
     big_integer result;
     if (*this >= divisor) {
@@ -130,7 +146,7 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
             uint32_t q = ((static_cast<uint64_t>(getDigit(k + divisor_size - 1)) << 32u) +
                           getDigit(k + divisor_size - 2)) / divisor_back;
             shifted_sub_ip(divisor * q, k - 1);
-            while (!isPositive()) {
+            while (!is_positive()) {
                 *this += divisor << ((k-1) * 8 * sizeof(uint32_t));
                 --q;
             }
@@ -310,7 +326,7 @@ big_integer operator>>(big_integer a, unsigned int b) {
 }
 
 bool operator==(big_integer const& a, big_integer const& b) {
-    if (a.isPositive() != b.isPositive() || a.bitCount() != b.bitCount())
+    if (a.is_positive() != b.is_positive() || a.bitCount() != b.bitCount())
         return false;
     for (size_t i = 0; i < a.digits_.size(); ++i) {
         if (a.digits_[i] != b.digits_[i])
@@ -328,12 +344,12 @@ bool operator<(big_integer const& a, big_integer const& b) {
 }
 
 bool operator>(big_integer const& a, big_integer const& b) {
-    if (a.isPositive() != b.isPositive())
-        return a.isPositive();
+    if (a.is_positive() != b.is_positive())
+        return a.is_positive();
     uint32_t a_bc = a.bitCount();
     uint32_t b_bc = b.bitCount();
     if (a_bc != b_bc) {
-        return (a.isPositive() == (a_bc > b_bc));
+        return (a.is_positive() == (a_bc > b_bc));
     }
     for (size_t i = a.digits_.size(); i != 0; --i) {
         if (a.digits_[i-1] > b.digits_[i-1])
@@ -364,7 +380,7 @@ std::string to_string(big_integer const& a) {
         r /= divisor;
     }
 
-    if (!a.isPositive())
+    if (!a.is_positive())
         s << "-";
     s << buffer.back();
     for (size_t i = buffer.size() - 1; i > 0; --i) {
@@ -385,12 +401,12 @@ uint32_t big_integer::bitCount() const {
     return count + bitCount(last_digit);
 }
 
-bool big_integer::isPositive() const {
+bool big_integer::is_positive() const {
     return isPositive(digits_.back());
 }
 
 big_integer& big_integer::trim() {
-    if (isPositive()) {
+    if (is_positive()) {
         while (digits_.size() > 1 && digits_.back() == 0 && isPositive(digits_[digits_.size() - 2]))
             digits_.pop_back();
     } else {
@@ -402,8 +418,8 @@ big_integer& big_integer::trim() {
 
 
 
-big_integer& big_integer::absInPlace() {
-    if (isPositive())
+big_integer& big_integer::abs_in_place() {
+    if (is_positive())
         return *this;
     else
         return this->negate();
@@ -412,7 +428,7 @@ big_integer& big_integer::absInPlace() {
 void big_integer::reserve(size_t new_size) {
     if (digits_.size() >= new_size)
         return;
-    uint32_t filler = (isPositive() ? 0 : UINT32_MAX);
+    uint32_t filler = (is_positive() ? 0 : UINT32_MAX);
     for (size_t i = digits_.size(); i < new_size; i++)
         digits_.push_back(filler);
 }
@@ -421,7 +437,7 @@ uint32_t big_integer::getDigit(size_t i) const {
     if (i < digits_.size()) {
         return digits_[i];
     } else {
-       if (isPositive())
+       if (is_positive())
            return 0;
        else
            return UINT32_MAX;
@@ -455,5 +471,5 @@ big_integer &big_integer::inverse() {
 
 big_integer big_integer::abs() const {
     big_integer r(*this);
-    return r.absInPlace();
+    return r.abs_in_place();
 }
