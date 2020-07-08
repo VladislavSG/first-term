@@ -4,13 +4,13 @@
 big_integer::big_integer() : big_integer(0) {}
 
 big_integer::big_integer(int x) {
-    digits_.push_back(x);
+    data_.push_back(x);
 }
 
 big_integer::big_integer(uint32_t x) {
-    digits_.push_back(x);
+    data_.push_back(x);
     if (!isPositive(x)) {
-        digits_.push_back(0);
+        data_.push_back(0);
     }
 }
 
@@ -25,79 +25,76 @@ big_integer::big_integer(std::string const& str) : big_integer(0) {
         (*this *= 10) += (str[i] - '0');
     }
     if (!isPositive) {
-        negateIp();
+        negateInPlace();
     }
 }
 
-big_integer& big_integer::shiftedAbstIp(big_integer const& rhs, size_t pos, uint32_t start,
-                                        std::function<uint32_t(uint32_t)> const& operation) {
-    size_t new_size = (digits_.size() > rhs.digits_.size() ? digits_.size() : rhs.digits_.size());
+big_integer& big_integer::shiftedAbstractInPlace(big_integer const& rhs, size_t pos, uint32_t start,
+                                   std::function<uint32_t(uint32_t)> const& operation, bool sign) {
+    size_t new_size = std::max(data_.size(), rhs.data_.size());
     reserve(new_size + 1);
 
     uint64_t carry_bit = start;
     for (size_t i = pos; i < new_size + 1; ++i) {
-        carry_bit += static_cast<uint64_t>(digits_[i]) + operation(rhs.getDigit(i - pos));
-        digits_[i] = carry_bit;
+        carry_bit += static_cast<uint64_t>(data_[i]) + operation(rhs.getDigit(i - pos, sign));
+        data_[i] = carry_bit;
         carry_bit >>= 32u;
     }
     return trim();
 }
 
-big_integer& big_integer::shiftedAddIp(big_integer const& rhs, size_t pos) {
-    return shiftedAbstIp(rhs, pos, 0, [](uint32_t a) { return a; });
+big_integer& big_integer::shiftedAddInPlace(big_integer const& rhs, size_t pos) {
+    return shiftedAbstractInPlace(rhs, pos, 0, [](uint32_t a) { return a; }, rhs.isPositive());
 }
 
-big_integer& big_integer::shiftedSubIp(big_integer const& rhs, size_t pos) {
-    return shiftedAbstIp(rhs, pos, 1, [](uint32_t a) { return ~a; });
+big_integer& big_integer::shiftedSubInPlace(big_integer const& rhs, size_t pos) {
+    return shiftedAbstractInPlace(rhs, pos, 1, [](uint32_t a) { return ~a; }, rhs.isPositive());
 }
 
-big_integer& big_integer::shiftedSubVectorIp(big_integer const& rhs, size_t pos) {
-    big_integer temp(rhs);
-    if (!rhs.isPositive())
-        temp.digits_.push_back(0u);         // it isn't negate!
-    return shiftedSubIp(temp, pos);
+big_integer& big_integer::shiftedSubVectorInPlace(big_integer const& rhs, size_t pos) {
+    return shiftedAbstractInPlace(rhs, pos, 1, [](uint32_t a) { return ~a; }, true);
 }
 
 big_integer& big_integer::operator+=(big_integer const& rhs) {
-    return shiftedAddIp(rhs, 0);
+    return shiftedAddInPlace(rhs, 0);
 }
 
 big_integer& big_integer::operator-=(big_integer const& rhs) {
-    return shiftedSubIp(rhs, 0);
+    return shiftedSubInPlace(rhs, 0);
 }
 
 big_integer& big_integer::operator*=(big_integer const& rhs) {
     big_integer result;
-    result.digits_.resize(digits_.size() + rhs.digits_.size() + 1);
-    for (size_t i = 0; i < digits_.size(); ++i) {
+    result.data_.resize(data_.size() + rhs.data_.size() + 1);
+    for (size_t i = 0; i < data_.size(); ++i) {
         uint64_t carry_digit = 0;
-        for (size_t j = 0; j < rhs.digits_.size(); ++j) {
-            carry_digit += static_cast<uint64_t>(digits_[i]) * rhs.digits_[j] + result.digits_[i+j];
-            result.digits_[i+j] = carry_digit;
+        for (size_t j = 0; j < rhs.data_.size(); ++j) {
+            carry_digit += static_cast<uint64_t>(data_[i]) * rhs.data_[j] + result.data_[i + j];
+            result.data_[i + j] = carry_digit;
             carry_digit = (carry_digit >> 32u);
         }
-        result.digits_[i + rhs.digits_.size()] += carry_digit;
+        result.data_[i + rhs.data_.size()] += carry_digit;
     }
     if (!rhs.isPositive()) {            // не забываем внести ПОПРАВКИ
-        result.shiftedSubVectorIp(*this, rhs.digits_.size());
+        result.shiftedSubVectorInPlace(*this, rhs.data_.size());
     }
     if (!isPositive()) {
-        result.shiftedSubVectorIp(rhs, digits_.size());
+        result.shiftedSubVectorInPlace(rhs, data_.size());
     }
     if (!rhs.isPositive() && !isPositive()) {
-        result.shiftedAddIp(big_integer(1),digits_.size() + rhs.digits_.size());
+        result.shiftedAddInPlace(big_integer(1), data_.size() + rhs.data_.size());
     }
     result.trim();
     std::swap(*this, result);
     return *this;
 }
 
-big_integer& big_integer::divAbsLongDigitIp(uint32_t x) {
+big_integer& big_integer::divAbsLongDigitInPlace(uint32_t x) {
     absInPlace();
     uint64_t carry = 0;
-    for (size_t i = digits_.size(); i > 0; --i) {
-        uint64_t cur_val = digits_[i - 1] + (carry << 32u);
-        digits_[i - 1] = static_cast<uint32_t>(cur_val / x);
+    for (size_t i = data_.size(); i > 0; --i) {
+        uint64_t cur_val = data_[i - 1] + (carry << 32u);
+        data_[i - 1] = static_cast<uint32_t>(cur_val / x);
         carry = cur_val % x;
     }
     return trim();
@@ -107,40 +104,40 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
     bool resultPositive = (isPositive() == rhs.isPositive());
     absInPlace();
 
-    if (rhs.digits_.size() == 1 || (rhs.digits_.size() == 2 && rhs.digits_.back() == 0)) {
-        divAbsLongDigitIp(rhs.abs().digits_[0]);
+    if (rhs.data_.size() == 1 || (rhs.data_.size() == 2 && rhs.data_.back() == 0)) {
+        divAbsLongDigitInPlace(rhs.abs().data_[0]);
         if (!resultPositive) {
-            negateIp();
+            negateInPlace();
         }
     } else {
         big_integer divisor(rhs.abs());
         big_integer result;
         if (*this >= divisor) {
             uint32_t divisorBack;
-            size_t divisorSize = divisor.digits_.size();
-            if (divisor.digits_.back()) {
-                divisorBack = divisor.digits_.back();
+            size_t divisorSize = divisor.data_.size();
+            if (divisor.data_.back()) {
+                divisorBack = divisor.data_.back();
             } else {
-                divisorBack = divisor.digits_[divisor.digits_.size() - 2];
+                divisorBack = divisor.data_[divisor.data_.size() - 2];
                 --divisorSize;
             }
             size_t shift = BIT_IN_DIGIT - bitCount(divisorBack);
             divisor <<= shift;
             *this <<= shift;
-            divisorBack = divisor.digits_[divisor.digits_.size() - 2];
-            result.reserve(digits_.size() - divisorSize + 1);
-            for (size_t k = digits_.size() - divisorSize + 1; k > 0; --k) {
+            divisorBack = divisor.data_[divisor.data_.size() - 2];
+            result.reserve(data_.size() - divisorSize + 1);
+            for (size_t k = data_.size() - divisorSize + 1; k > 0; --k) {
                 uint32_t q = ((static_cast<uint64_t>(getDigit(k + divisorSize - 1)) << 32u) +
                               getDigit(k + divisorSize - 2)) / divisorBack;
-                shiftedSubIp(divisor * q, k - 1);
+                shiftedSubInPlace(divisor * q, k - 1);
                 while (!isPositive()) {     // works no more than 2 times
-                    shiftedAddIp(divisor, k - 1);
+                    shiftedAddInPlace(divisor, k - 1);
                     --q;
                 }
-                result.digits_[k - 1] = q;
+                result.data_[k - 1] = q;
             }
             if (!resultPositive) {
-                result.negateIp();
+                result.negateInPlace();
             }
         }
         std::swap(*this, result);
@@ -154,10 +151,10 @@ big_integer& big_integer::operator%=(big_integer const& rhs) {
 
 big_integer& big_integer::bit_operation(big_integer const& rhs, const
 std::function<uint32_t(uint32_t, uint32_t)>& operation) {
-    size_t max_size = (rhs.digits_.size() > digits_.size() ? rhs.digits_.size() : digits_.size());
+    size_t max_size = (rhs.data_.size() > data_.size() ? rhs.data_.size() : data_.size());
     reserve(max_size);
     for (size_t i = 0; i < max_size; ++i) {
-        digits_[i] = operation(digits_[i], rhs.getDigit(i));
+        data_[i] = operation(data_[i], rhs.getDigit(i));
     }
     return trim();
 }
@@ -182,21 +179,21 @@ big_integer& big_integer::operator<<=(unsigned int rhs) {
     unsigned int digit_count = rhs / BIT_IN_DIGIT;
     unsigned int bit_count_l = rhs % BIT_IN_DIGIT;
     unsigned int bit_count_r =  BIT_IN_DIGIT - bit_count_l;
-    size_t new_size = digits_.size() + digit_count + (bit_count_l ? 1 : 0);
+    size_t new_size = data_.size() + digit_count + (bit_count_l ? 1 : 0);
     reserve(new_size);
     if (bit_count_l) {
         for (size_t i = new_size; i > digit_count + 1; --i) {
-            digits_[i - 1] = (getDigit(i - digit_count - 1) << bit_count_l) +
-                         (getDigit(i - digit_count - 2) >> bit_count_r);
+            data_[i - 1] = (getDigit(i - digit_count - 1) << bit_count_l) +
+                           (getDigit(i - digit_count - 2) >> bit_count_r);
         }
-        digits_[digit_count] = (getDigit(0) << bit_count_l);
+        data_[digit_count] = (getDigit(0) << bit_count_l);
     } else {
         for (size_t i = new_size; i > digit_count; --i) {
-            digits_[i - 1] = digits_[i - digit_count - 1];
+            data_[i - 1] = data_[i - digit_count - 1];
         }
     }
     for (size_t i = 0; i < digit_count; ++i) {
-        digits_[i] = 0;
+        data_[i] = 0;
     }
     return trim();
 }
@@ -205,24 +202,24 @@ big_integer& big_integer::operator>>=(unsigned int rhs) {
     if (rhs == 0) {
         return *this;
     }
-    size_t digit_size = digits_.size();
+    size_t digit_size = data_.size();
     unsigned int digit_count = rhs / BIT_IN_DIGIT;
     unsigned int bit_count_r = rhs % BIT_IN_DIGIT;
     unsigned int bit_count_l = BIT_IN_DIGIT - bit_count_r;
     size_t i = 0;
     if (bit_count_r) {
         for (; i < digit_size - digit_count; ++i) {
-            digits_[i] = (getDigit(i + digit_count) >> bit_count_r) +
-                         (getDigit(i + digit_count + 1) << bit_count_l);
+            data_[i] = (getDigit(i + digit_count) >> bit_count_r) +
+                       (getDigit(i + digit_count + 1) << bit_count_l);
         }
     } else {
         for (; i < digit_size - digit_count; ++i) {
-            digits_[i] = getDigit(i + digit_count);
+            data_[i] = getDigit(i + digit_count);
         }
     }
 
     for (; i < digit_size; ++i) {
-        digits_.pop_back();
+        data_.pop_back();
     }
     return trim();
 }
@@ -232,11 +229,11 @@ big_integer big_integer::operator+() const {
 }
 
 big_integer big_integer::operator-() const {
-    return big_integer(*this).negateIp();
+    return big_integer(*this).negateInPlace();
 }
 
 big_integer big_integer::operator~() const {
-    return big_integer(*this).inverseIp();
+    return big_integer(*this).inverseInPlace();
 }
 
 big_integer& big_integer::operator++() {
@@ -300,19 +297,19 @@ big_integer operator>>(big_integer a, unsigned int b) {
 }
 
 bool big_integer::vectorAbsSmaller(big_integer const& a, big_integer const& b) {
-    if (a.digits_.size() != b.digits_.size()) {
-        return a.digits_.size() < b.digits_.size();
+    if (a.data_.size() != b.data_.size()) {
+        return a.data_.size() < b.data_.size();
     } else {
-        return std::lexicographical_compare(a.digits_.rbegin(), a.digits_.rend(),
-                                            b.digits_.rbegin(), b.digits_.rend());
+        return std::lexicographical_compare(a.data_.rbegin(), a.data_.rend(),
+                                            b.data_.rbegin(), b.data_.rend());
     }
 }
 
 bool operator==(big_integer const& a, big_integer const& b) {
-    if (a.isPositive() != b.isPositive() || a.digits_.size() != b.digits_.size()) {
+    if (a.isPositive() != b.isPositive() || a.data_.size() != b.data_.size()) {
         return false;
     }
-    return std::equal(a.digits_.begin(), a.digits_.end(), b.digits_.begin());
+    return std::equal(a.data_.begin(), a.data_.end(), b.data_.begin());
 }
 
 bool operator!=(big_integer const& a, big_integer const& b) {
@@ -323,8 +320,8 @@ bool operator<(big_integer const& a, big_integer const& b) {
     if (a.isPositive() != b.isPositive()) {
         return b.isPositive();
     }
-    if (a.digits_.size() != b.digits_.size()) {
-        return a.isPositive() == (a.digits_.size() < b.digits_.size());
+    if (a.data_.size() != b.data_.size()) {
+        return a.isPositive() == (a.data_.size() < b.data_.size());
     }
     return big_integer::vectorAbsSmaller(a, b);
 }
@@ -350,8 +347,8 @@ std::string to_string(big_integer const& a) {
     std::stringstream s;
     big_integer r = a.abs();
     while (r > 0) {
-        buffer.push_back((r % divisor).digits_[0]);
-        r.divAbsLongDigitIp(divisor);
+        buffer.push_back((r % divisor).data_[0]);
+        r.divAbsLongDigitInPlace(divisor);
     }
 
     if (!a.isPositive()) {
@@ -371,14 +368,13 @@ std::ostream& operator<<(std::ostream& s, big_integer const& a) {
 }
 
 bool big_integer::isPositive() const {
-    return isPositive(digits_.back());
+    return isPositive(data_.back());
 }
 
 big_integer& big_integer::trim() {
-    // test digits_.back() == 0 or UINT32_MAX
-    while (digits_.size() > 1 && (digits_.back() + 1 < 2) &&
-    ((digits_.back() == 0) == isPositive(digits_[digits_.size() - 2]))) {
-        digits_.pop_back();
+    while (data_.size() > 1 && (data_.back() == 0 || data_.back() == UINT32_MAX) &&
+           ((data_.back() == 0) == isPositive(data_[data_.size() - 2]))) {
+        data_.pop_back();
     }
     return *this;
 }
@@ -387,29 +383,41 @@ big_integer& big_integer::absInPlace() {
     if (isPositive()) {
         return *this;
     } else {
-        return negateIp();
+        return negateInPlace();
     }
 }
 
 void big_integer::reserve(size_t new_size) {
-    if (digits_.size() >= new_size) {
+    if (data_.size() >= new_size) {
         return;
     }
     uint32_t filler = (isPositive() ? 0 : UINT32_MAX);
-    for (size_t i = digits_.size(); i < new_size; ++i) {
-        digits_.push_back(filler);
+    for (size_t i = data_.size(); i < new_size; ++i) {
+        data_.push_back(filler);
     }
 }
 
 uint32_t big_integer::getDigit(size_t i) const {
-    if (i < digits_.size()) {
-        return digits_[i];
+    if (i < data_.size()) {
+        return data_[i];
     } else {
        if (isPositive()) {
            return 0;
        } else {
            return UINT32_MAX;
        }
+    }
+}
+
+uint32_t big_integer::getDigit(size_t i, bool sign) const {
+    if (i < data_.size()) {
+        return data_[i];
+    } else {
+        if (sign) {
+            return 0;
+        } else {
+            return UINT32_MAX;
+        }
     }
 }
 
@@ -426,14 +434,14 @@ bool big_integer::isPositive(uint32_t x) {
     return (x >> 31u) == 0;
 }
 
-big_integer& big_integer::negateIp() {
-    reserve(digits_.size() + 1);
-    ++inverseIp();
+big_integer& big_integer::negateInPlace() {
+    reserve(data_.size() + 1);
+    ++inverseInPlace();
     return trim();
 }
 
-big_integer& big_integer::inverseIp() {
-    for (auto &i : digits_) {
+big_integer& big_integer::inverseInPlace() {
+    for (auto &i : data_) {
         i = ~i;
     }
     return trim();
