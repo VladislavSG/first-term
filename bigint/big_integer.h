@@ -59,7 +59,7 @@ struct big_integer
 
 private:
     std::vector<uint32_t> digits_{}; //храним в little endian в дополнительном коде
-    const size_t BIT_IN_DIGIT = 8 * sizeof(uint32_t);
+    static const size_t BIT_IN_DIGIT = 8 * sizeof(uint32_t);
 
     big_integer& shiftedAbstIp(big_integer const &, size_t, uint32_t,
             std::function<uint32_t(uint32_t)> const&);

@@ -124,7 +124,7 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
                 divisorBack = divisor.digits_[divisor.digits_.size() - 2];
                 --divisorSize;
             }
-            size_t shift = sizeof(uint32_t) * 8 - bitCount(divisorBack);
+            size_t shift = BIT_IN_DIGIT - bitCount(divisorBack);
             divisor <<= shift;
             *this <<= shift;
             divisorBack = divisor.digits_[divisor.digits_.size() - 2];
@@ -179,9 +179,9 @@ big_integer& big_integer::operator<<=(unsigned int rhs) {
     if (rhs == 0) {
         return *this;
     }
-    unsigned int digit_count = rhs / (8 * sizeof(uint32_t));
-    unsigned int bit_count_l = rhs % (8 * sizeof(uint32_t));
-    unsigned int bit_count_r =  sizeof(uint32_t) * 8u - bit_count_l;
+    unsigned int digit_count = rhs / BIT_IN_DIGIT;
+    unsigned int bit_count_l = rhs % BIT_IN_DIGIT;
+    unsigned int bit_count_r =  BIT_IN_DIGIT - bit_count_l;
     size_t new_size = digits_.size() + digit_count + (bit_count_l ? 1 : 0);
     reserve(new_size);
     if (bit_count_l) {
@@ -206,9 +206,9 @@ big_integer& big_integer::operator>>=(unsigned int rhs) {
         return *this;
     }
     size_t digit_size = digits_.size();
-    unsigned int digit_count = rhs / (8 * sizeof(uint32_t));
-    unsigned int bit_count_r = rhs % (8 * sizeof(uint32_t));
-    unsigned int bit_count_l = (8 * sizeof(uint32_t)) - bit_count_r;
+    unsigned int digit_count = rhs / BIT_IN_DIGIT;
+    unsigned int bit_count_r = rhs % BIT_IN_DIGIT;
+    unsigned int bit_count_l = BIT_IN_DIGIT - bit_count_r;
     size_t i = 0;
     if (bit_count_r) {
         for (; i < digit_size - digit_count; ++i) {
