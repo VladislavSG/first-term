@@ -63,6 +63,7 @@ private:
 
     big_integer& shiftedAbstIp(big_integer const &, size_t, uint32_t,
             std::function<uint32_t(uint32_t)> const&);
+    big_integer& shiftedSubVectorIp(big_integer const&, size_t);
     big_integer& trim();
     void reserve(size_t);
     uint32_t getDigit(size_t) const;
