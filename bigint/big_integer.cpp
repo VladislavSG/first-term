@@ -63,25 +63,14 @@ big_integer &big_integer::shifted_sub_ip(big_integer const& rhs, size_t pos) {
     size_t new_size = (digits_.size() > rhs.digits_.size() ? digits_.size() : rhs.digits_.size());
     reserve(new_size + 1);
 
-    uint32_t carry_bit = 1u;
+    uint64_t carry_bit = 1u;
     for (size_t i = pos; i < new_size + 1; i++) {
-        uint32_t new_carry_bit;
-        if (isAddOverflow(digits_[i], ~rhs.getDigit(i - pos)) ||
-            isAddOverflow(digits_[i] + ~rhs.getDigit(i - pos), carry_bit))
-            new_carry_bit = 1u;
-        else
-            new_carry_bit = 0u;
-        digits_[i] += ~rhs.getDigit(i - pos) + carry_bit;
-        carry_bit = new_carry_bit;
+        carry_bit += static_cast<uint64_t>(digits_[i]) + ~rhs.getDigit(i - pos);
+        digits_[i] = carry_bit;
+        carry_bit >>= 32u;
     }
     trim();
     return *this;
-}
-
-big_integer &big_integer::shifted_sub_abs_ip(big_integer const& rhs, size_t pos) {
-    big_integer temp(rhs);
-    temp.digits_.push_back(0);
-    return shifted_sub_ip(temp, pos);
 }
 
 big_integer& big_integer::operator*=(big_integer const& rhs) {
