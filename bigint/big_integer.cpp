@@ -29,46 +29,34 @@ big_integer::big_integer(std::string const& str) : big_integer(0) {
     }
 }
 
-bool isAddOverflow(uint32_t a, uint32_t b) {
-    return (UINT32_MAX - a < b);
-}
-
-big_integer& big_integer::operator+=(big_integer const& rhs) {
+big_integer& big_integer::shiftedAbstIp(big_integer const& rhs, size_t pos, uint32_t start,
+                                        std::function<uint32_t(uint32_t)> const& operation) {
     size_t new_size = (digits_.size() > rhs.digits_.size() ? digits_.size() : rhs.digits_.size());
     reserve(new_size + 1);
 
-    uint32_t carry_bit = 0u;
-    for (size_t i = 0u; i < new_size + 1; i++) {
-        uint32_t new_carry_bit;
-        if (isAddOverflow(digits_[i], rhs.getDigit(i)) ||
-        isAddOverflow(digits_[i] + rhs.getDigit(i), carry_bit)) {
-            new_carry_bit = 1u;
-        } else {
-            new_carry_bit = 0u;
-        }
-        digits_[i] += rhs.getDigit(i) + carry_bit;
-        carry_bit = new_carry_bit;
+    uint64_t carry_bit = start;
+    for (size_t i = pos; i < new_size + 1; i++) {
+        carry_bit += static_cast<uint64_t>(digits_[i]) + operation(rhs.getDigit(i - pos));
+        digits_[i] = carry_bit;
+        carry_bit >>= 32u;
     }
-    trim();
-    return *this;
+    return trim();
+}
+
+big_integer& big_integer::shiftedAddIp(big_integer const& rhs, size_t pos) {
+    return shiftedAbstIp(rhs, pos, 0, [](uint32_t a) { return a; });
+}
+
+big_integer &big_integer::shiftedSubIp(big_integer const& rhs, size_t pos) {
+    return shiftedAbstIp(rhs, pos, 1, [](uint32_t a) { return ~a; });
+}
+
+big_integer& big_integer::operator+=(big_integer const& rhs) {
+    return shiftedAddIp(rhs, 0);
 }
 
 big_integer& big_integer::operator-=(big_integer const& rhs) {
     return shiftedSubIp(rhs, 0);
-}
-
-big_integer &big_integer::shiftedSubIp(big_integer const& rhs, size_t pos) {
-    size_t new_size = (digits_.size() > rhs.digits_.size() ? digits_.size() : rhs.digits_.size());
-    reserve(new_size + 1);
-
-    uint64_t carry_bit = 1u;
-    for (size_t i = pos; i < new_size + 1; i++) {
-        carry_bit += static_cast<uint64_t>(digits_[i]) + ~rhs.getDigit(i - pos);
-        digits_[i] = carry_bit;
-        carry_bit >>= 32u;
-    }
-    trim();
-    return *this;
 }
 
 big_integer& big_integer::operator*=(big_integer const& rhs) {
@@ -77,10 +65,10 @@ big_integer& big_integer::operator*=(big_integer const& rhs) {
     for (size_t i = 0; i < digits_.size(); i++) {
         uint32_t carry_digit = 0;
         for (size_t j = 0; j < rhs.digits_.size(); j++) {
-            uint64_t mul2 = static_cast<uint64_t>(digits_[i])*rhs.digits_[j] + carry_digit;
-            uint32_t carry_add_bit = (isAddOverflow(result.digits_[i+j], mul2) ? 1 : 0);
-            result.digits_[i+j] += mul2;
-            carry_digit = (mul2 >> 32u) + carry_add_bit;
+            uint64_t mul2 = static_cast<uint64_t>(digits_[i])*rhs.digits_[j] +
+                    carry_digit + result.digits_[i+j];
+            result.digits_[i+j] = mul2;
+            carry_digit = (mul2 >> 32u);
         }
         result.digits_[i + rhs.digits_.size()] += carry_digit;
     }
