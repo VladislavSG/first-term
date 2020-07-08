@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <iosfwd>
+#include <functional>
 
 struct big_integer
 {
@@ -20,6 +21,8 @@ struct big_integer
     big_integer& operator/=(big_integer const& rhs);
     big_integer& operator%=(big_integer const& rhs);
 
+    big_integer& bit_operation(big_integer const& rhs,
+            std::function<uint32_t(uint32_t, uint32_t)> const& operation);
     big_integer& operator&=(big_integer const& rhs);
     big_integer& operator|=(big_integer const& rhs);
     big_integer& operator^=(big_integer const& rhs);
