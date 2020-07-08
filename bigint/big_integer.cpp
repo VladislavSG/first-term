@@ -139,7 +139,6 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
                 }
                 result.digits_[k - 1] = q;
             }
-            result.trim();
             if (!resultPositive) {
                 result.negateIp();
             }
@@ -150,10 +149,7 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
 }
 
 big_integer& big_integer::operator%=(big_integer const& rhs) {
-    big_integer r(*this);
-    r /= rhs;
-    *this -= r * rhs;
-    return *this;
+    return *this -= big_integer(*this) / rhs * rhs;
 }
 
 big_integer& big_integer::bit_operation(big_integer const& rhs, const
@@ -303,9 +299,19 @@ big_integer operator>>(big_integer a, unsigned int b) {
     return a >>= b;
 }
 
+bool big_integer::vectorAbsSmaller(big_integer const& a, big_integer const& b) {
+    if (a.digits_.size() != b.digits_.size()) {
+        return a.digits_.size() < b.digits_.size();
+    } else {
+        return std::lexicographical_compare(a.digits_.rbegin(), a.digits_.rend(),
+                                            b.digits_.rbegin(), b.digits_.rend());
+    }
+}
+
 bool operator==(big_integer const& a, big_integer const& b) {
-    if (a.isPositive() != b.isPositive() || a.bitCount() != b.bitCount())
+    if (a.isPositive() != b.isPositive() || a.digits_.size() != b.digits_.size()) {
         return false;
+    }
     for (size_t i = 0; i < a.digits_.size(); ++i) {
         if (a.digits_[i] != b.digits_[i])
             return false;
@@ -318,33 +324,25 @@ bool operator!=(big_integer const& a, big_integer const& b) {
 }
 
 bool operator<(big_integer const& a, big_integer const& b) {
-    return b > a;
+    if (a.isPositive() != b.isPositive()) {
+        return b.isPositive();
+    }
+    if (a.digits_.size() != b.digits_.size()) {
+        return a.isPositive() == (a.digits_.size() < b.digits_.size());
+    }
+    return big_integer::vectorAbsSmaller(a, b);
 }
 
 bool operator>(big_integer const& a, big_integer const& b) {
-    if (a.isPositive() != b.isPositive())
-        return a.isPositive();
-    uint32_t a_bc = a.bitCount();
-    uint32_t b_bc = b.bitCount();
-    if (a_bc != b_bc) {
-        return (a.isPositive() == (a_bc > b_bc));
-    }
-    for (size_t i = a.digits_.size(); i != 0; --i) {
-        if (a.digits_[i-1] > b.digits_[i-1]) {
-            return true;
-        } else if (a.digits_[i-1] < b.digits_[i-1]) {
-            return false;
-        }
-    }
-    return false;
+    return b < a;
 }
 
 bool operator<=(big_integer const& a, big_integer const& b) {
-    return !(a > b);
+    return !(b < a);
 }
 
 bool operator>=(big_integer const& a, big_integer const& b) {
-    return !(b > a);
+    return !(a < b);
 }
 
 std::string to_string(big_integer const& a) {
@@ -374,11 +372,6 @@ std::string to_string(big_integer const& a) {
 
 std::ostream& operator<<(std::ostream& s, big_integer const& a) {
     return s << to_string(a);
-}
-
-uint32_t big_integer::bitCount() const {
-    uint32_t count = sizeof(uint32_t) * (digits_.size() - 1) * 8u;
-    return count + bitCount(digits_.back());
 }
 
 bool big_integer::isPositive() const {
