@@ -9,7 +9,7 @@ big_integer::big_integer(int x) {
 
 big_integer::big_integer(uint32_t x) {
     digits_.push_back(x);
-    if (!isPositive()) {
+    if (!isPositive(x)) {
         digits_.push_back(0);
     }
 }
@@ -35,7 +35,7 @@ big_integer& big_integer::shiftedAbstIp(big_integer const& rhs, size_t pos, uint
     reserve(new_size + 1);
 
     uint64_t carry_bit = start;
-    for (size_t i = pos; i < new_size + 1; i++) {
+    for (size_t i = pos; i < new_size + 1; ++i) {
         carry_bit += static_cast<uint64_t>(digits_[i]) + operation(rhs.getDigit(i - pos));
         digits_[i] = carry_bit;
         carry_bit >>= 32u;
@@ -47,8 +47,15 @@ big_integer& big_integer::shiftedAddIp(big_integer const& rhs, size_t pos) {
     return shiftedAbstIp(rhs, pos, 0, [](uint32_t a) { return a; });
 }
 
-big_integer &big_integer::shiftedSubIp(big_integer const& rhs, size_t pos) {
+big_integer& big_integer::shiftedSubIp(big_integer const& rhs, size_t pos) {
     return shiftedAbstIp(rhs, pos, 1, [](uint32_t a) { return ~a; });
+}
+
+big_integer& big_integer::shiftedSubVectorIp(big_integer const& rhs, size_t pos) {
+    big_integer temp(rhs);
+    if (!rhs.isPositive())
+        temp.digits_.push_back(0u);         // it isn't negate!
+    return shiftedSubIp(temp, pos);
 }
 
 big_integer& big_integer::operator+=(big_integer const& rhs) {
@@ -62,30 +69,23 @@ big_integer& big_integer::operator-=(big_integer const& rhs) {
 big_integer& big_integer::operator*=(big_integer const& rhs) {
     big_integer result;
     result.digits_.resize(digits_.size() + rhs.digits_.size() + 1);
-    for (size_t i = 0; i < digits_.size(); i++) {
-        uint32_t carry_digit = 0;
-        for (size_t j = 0; j < rhs.digits_.size(); j++) {
-            uint64_t mul2 = static_cast<uint64_t>(digits_[i])*rhs.digits_[j] +
-                    carry_digit + result.digits_[i+j];
-            result.digits_[i+j] = mul2;
-            carry_digit = (mul2 >> 32u);
+    for (size_t i = 0; i < digits_.size(); ++i) {
+        uint64_t carry_digit = 0;
+        for (size_t j = 0; j < rhs.digits_.size(); ++j) {
+            carry_digit += static_cast<uint64_t>(digits_[i]) * rhs.digits_[j] + result.digits_[i+j];
+            result.digits_[i+j] = carry_digit;
+            carry_digit = (carry_digit >> 32u);
         }
         result.digits_[i + rhs.digits_.size()] += carry_digit;
     }
-    if (!rhs.isPositive()) {
-        //result.shifted_sub_abs_ip(*this, rhs.digits_.size());
-        big_integer temp = *this << (rhs.digits_.size() * sizeof(uint32_t) * 8);
-        temp.digits_.push_back(0);
-        result -= temp;
+    if (!rhs.isPositive()) {            // не забываем внести ПОПРАВКИ
+        result.shiftedSubVectorIp(*this, rhs.digits_.size());
     }
     if (!isPositive()) {
-        //result.shifted_sub_abs_ip(rhs, digits_.size());
-        big_integer temp = rhs << (digits_.size() * sizeof(uint32_t) * 8);
-        temp.digits_.push_back(0);
-        result -= temp;
+        result.shiftedSubVectorIp(rhs, digits_.size());
     }
     if (!rhs.isPositive() && !isPositive()) {
-        result += big_integer(1) <<= ((digits_.size() + rhs.digits_.size()) * sizeof(uint32_t) * 8);
+        result.shiftedAddIp(big_integer(1),digits_.size() + rhs.digits_.size());
     }
     result.trim();
     std::swap(*this, result);
@@ -93,9 +93,9 @@ big_integer& big_integer::operator*=(big_integer const& rhs) {
 }
 
 big_integer& big_integer::divAbsLongDigitIp(uint32_t x) {
-    uint64_t carry = 0;
     absInPlace();
-    for (size_t i = digits_.size(); i > 0; i--) {
+    uint64_t carry = 0;
+    for (size_t i = digits_.size(); i > 0; --i) {
         uint64_t cur_val = digits_[i - 1] + (carry << 32u);
         digits_[i - 1] = static_cast<uint32_t>(cur_val / x);
         carry = cur_val % x;
@@ -104,49 +104,49 @@ big_integer& big_integer::divAbsLongDigitIp(uint32_t x) {
 }
 
 big_integer& big_integer::operator/=(big_integer const& rhs) {
+    bool resultPositive = (isPositive() == rhs.isPositive());
+    absInPlace();
+
     if (rhs.digits_.size() == 1 || (rhs.digits_.size() == 2 && rhs.digits_.back() == 0)) {
-        bool p = isPositive() == rhs.isPositive();
         divAbsLongDigitIp(rhs.abs().digits_[0]);
-        if (!p) {
+        if (!resultPositive) {
             negateIp();
         }
-        return *this;
-    }
-    bool result_positive = (isPositive() == rhs.isPositive());
-    absInPlace();
-    big_integer divisor(rhs.abs());
-    big_integer result;
-    if (*this >= divisor) {
-        uint32_t divisor_back;
-        size_t divisor_size = divisor.digits_.size();
-        if (divisor.digits_.back()) {
-            divisor_back = divisor.digits_.back();
-        } else {
-            divisor_back = divisor.digits_[divisor.digits_.size() - 2];
-            --divisor_size;
-        }
-        size_t shift = sizeof(uint32_t) * 8 - bitCount(divisor_back);
-        divisor <<= shift;
-        *this <<= shift;
-        divisor_back = divisor.digits_[divisor.digits_.size() - 2];
-        result.reserve(digits_.size() - divisor_size + 1);
-        for (size_t k = digits_.size() - divisor_size + 1; k > 0; --k) {
-            uint32_t q = ((static_cast<uint64_t>(getDigit(k + divisor_size - 1)) << 32u) +
-                          getDigit(k + divisor_size - 2)) / divisor_back;
-            shiftedSubIp(divisor * q, k - 1);
-            while (!isPositive()) {
-                *this += divisor << ((k-1) * 8 * sizeof(uint32_t));
-                --q;
+    } else {
+        big_integer divisor(rhs.abs());
+        big_integer result;
+        if (*this >= divisor) {
+            uint32_t divisorBack;
+            size_t divisorSize = divisor.digits_.size();
+            if (divisor.digits_.back()) {
+                divisorBack = divisor.digits_.back();
+            } else {
+                divisorBack = divisor.digits_[divisor.digits_.size() - 2];
+                --divisorSize;
             }
-            result.digits_[k - 1] = q;
+            size_t shift = sizeof(uint32_t) * 8 - bitCount(divisorBack);
+            divisor <<= shift;
+            *this <<= shift;
+            divisorBack = divisor.digits_[divisor.digits_.size() - 2];
+            result.reserve(digits_.size() - divisorSize + 1);
+            for (size_t k = digits_.size() - divisorSize + 1; k > 0; --k) {
+                uint32_t q = ((static_cast<uint64_t>(getDigit(k + divisorSize - 1)) << 32u) +
+                              getDigit(k + divisorSize - 2)) / divisorBack;
+                shiftedSubIp(divisor * q, k - 1);
+                while (!isPositive()) {     // works no more than 2 times
+                    shiftedAddIp(divisor, k - 1);
+                    --q;
+                }
+                result.digits_[k - 1] = q;
+            }
+            result.trim();
+            if (!resultPositive) {
+                result.negateIp();
+            }
         }
-        result.trim();
-        if (!result_positive) {
-            result.negateIp();
-        }
+        std::swap(*this, result);
     }
-    std::swap(*this, result);
-    return *this;
+    return trim();
 }
 
 big_integer& big_integer::operator%=(big_integer const& rhs) {
@@ -202,8 +202,7 @@ big_integer& big_integer::operator<<=(unsigned int rhs) {
     for (size_t i = 0; i < digit_count; ++i) {
         digits_[i] = 0;
     }
-    trim();
-    return *this;
+    return trim();
 }
 
 big_integer& big_integer::operator>>=(unsigned int rhs) {
@@ -229,8 +228,7 @@ big_integer& big_integer::operator>>=(unsigned int rhs) {
     for (; i < digit_size; ++i) {
         digits_.pop_back();
     }
-    trim();
-    return *this;
+    return trim();
 }
 
 big_integer big_integer::operator+() const {
@@ -409,7 +407,7 @@ void big_integer::reserve(size_t new_size) {
         return;
     }
     uint32_t filler = (isPositive() ? 0 : UINT32_MAX);
-    for (size_t i = digits_.size(); i < new_size; i++) {
+    for (size_t i = digits_.size(); i < new_size; ++i) {
         digits_.push_back(filler);
     }
 }
@@ -429,7 +427,7 @@ uint32_t big_integer::getDigit(size_t i) const {
 uint32_t big_integer::bitCount(uint32_t d) {
     uint32_t count = 0;
     while (d > 0) {
-        count++;
+        ++count;
         d /= 2;
     }
     return count;
