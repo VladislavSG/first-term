@@ -38,14 +38,14 @@ struct big_integer
     big_integer operator--(int);
 
     uint32_t bitCount() const;
-    big_integer& absInPlace();
+    big_integer& abs_in_place();
     big_integer abs() const;
-    bool isPositive() const;
+    bool is_positive() const;
     big_integer &negate();
     big_integer &inverse();
 
     big_integer& shifted_sub_ip(big_integer const &rhs, size_t pos);
-    big_integer& shifted_sub_abs_ip(big_integer const &rhs, size_t pos);
+    big_integer& div_long_digit(uint32_t);
 
     friend bool operator==(big_integer const& a, big_integer const& b);
     friend bool operator!=(big_integer const& a, big_integer const& b);
