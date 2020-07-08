@@ -1,9 +1,7 @@
 #ifndef BIG_INTEGER_H
 #define BIG_INTEGER_H
 
-#include <memory>
 #include <vector>
-#include <iosfwd>
 #include <functional>
 
 struct big_integer
