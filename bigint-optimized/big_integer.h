@@ -3,8 +3,9 @@
 
 #include <vector>
 #include <functional>
+#include "my_opt_vector.h"
 
-using storage_t = std::vector<uint32_t>;
+using storage_t = my_opt_vector<uint32_t>;
 
 struct big_integer
 {
