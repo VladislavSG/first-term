@@ -300,8 +300,12 @@ bool big_integer::vectorAbsSmaller(big_integer const& a, big_integer const& b) {
     if (a.data_.size() != b.data_.size()) {
         return a.data_.size() < b.data_.size();
     } else {
-        return std::lexicographical_compare(a.data_.rbegin(), a.data_.rend(),
-                                            b.data_.rbegin(), b.data_.rend());
+        for (size_t i = a.data_.size(); i > 0; i--) {
+            if (a.data_[i - 1] < b.data_[i - 1]) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -309,7 +313,12 @@ bool operator==(big_integer const& a, big_integer const& b) {
     if (a.isPositive() != b.isPositive() || a.data_.size() != b.data_.size()) {
         return false;
     }
-    return std::equal(a.data_.begin(), a.data_.end(), b.data_.begin());
+    for (size_t i = a.data_.size(); i > 0; i--) {
+        if (a.data_[i - 1] != b.data_[i - 1]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool operator!=(big_integer const& a, big_integer const& b) {
@@ -441,8 +450,8 @@ big_integer& big_integer::negateInPlace() {
 }
 
 big_integer& big_integer::inverseInPlace() {
-    for (auto &i : data_) {
-        i = ~i;
+    for (size_t i = 0; i < data_.size(); ++i) {
+        data_[i] = ~data_[i];
     }
     return trim();
 }
