@@ -17,11 +17,16 @@ big_integer::big_integer(uint32_t x) {
 big_integer::big_integer(std::string const& str) : big_integer(0) {
     size_t i = 0;
     bool isPositive = true;
-    if (str[0] == '-') {
-        isPositive = false;
+    if (str.empty()) {
+        throw std::invalid_argument("Empty string");
+    }
+    if (str[0] == '-' || str[0] == '+') {
+        isPositive = (str[0] == '+');
         i = 1;
     }
     for (;i < str.size(); ++i) {
+        if (str[i] < '0' || str[i] > '9')
+            throw std::invalid_argument("Invalid string");
         (*this *= 10) += (str[i] - '0');
     }
     if (!isPositive) {
