@@ -1,5 +1,6 @@
 #include "big_integer.h"
 #include <sstream>
+#include <iostream>
 
 big_integer::big_integer() : big_integer(0) {}
 
@@ -25,8 +26,9 @@ big_integer::big_integer(std::string const& str) : big_integer(0) {
         i = 1;
     }
     for (;i < str.size(); ++i) {
-        if (str[i] < '0' || str[i] > '9')
+        if (str[i] < '0' || str[i] > '9') {
             throw std::invalid_argument("Invalid string");
+        }
         (*this *= 10) += (str[i] - '0');
     }
     if (!isPositive) {
@@ -90,7 +92,7 @@ big_integer& big_integer::operator*=(big_integer const& rhs) {
         result.shiftedAddInPlace(big_integer(1), data_.size() + rhs.data_.size());
     }
     result.trim();
-    std::swap(*this, result);
+    *this = result;
     return *this;
 }
 
@@ -145,7 +147,7 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
                 result.negateInPlace();
             }
         }
-        std::swap(*this, result);
+        *this = result;
     }
     return trim();
 }
@@ -460,4 +462,9 @@ big_integer& big_integer::inverseInPlace() {
 
 big_integer big_integer::abs() const {
     return big_integer(*this).absInPlace();
+}
+
+void swap (big_integer &a, big_integer &b) {
+    using std::swap;
+    swap(a.data_, b.data_);
 }

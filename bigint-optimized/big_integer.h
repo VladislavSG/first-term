@@ -59,6 +59,7 @@ struct big_integer
     friend bool operator>=(big_integer const&, big_integer const&);
 
     friend std::string to_string(big_integer const&);
+    friend void swap (big_integer &, big_integer &);
 
 private:
     storage_t data_; //храним в little endian в дополнительном коде
@@ -99,5 +100,7 @@ bool operator>=(big_integer const&, big_integer const&);
 
 std::string to_string(big_integer const&);
 std::ostream& operator<<(std::ostream& s, big_integer const&);
+
+void swap (big_integer &, big_integer &);
 
 #endif // BIG_INTEGER_H
