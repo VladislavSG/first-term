@@ -1,7 +1,7 @@
 #ifndef BIGINT_MY_OPT_VECTOR_H
 #define BIGINT_MY_OPT_VECTOR_H
 
-#include <vector>
+#include <stdexcept>
 #include <memory>
 #include <algorithm>
 #include "dynamic_buffer.h"
@@ -71,6 +71,9 @@ struct my_opt_vector {
 
     T& operator[](size_t n) {
         if (isSmall_) {
+            if (n > MAX_STATIC_SIZE) {
+                throw std::logic_error("invalid isSmall_ flag");
+            }
             return staticData_[n];
         } else {
             unshare();
@@ -80,6 +83,9 @@ struct my_opt_vector {
 
     T const& operator[](size_t n) const {
         if (isSmall_) {
+            if (n > MAX_STATIC_SIZE) {
+                throw std::logic_error("invalid isSmall_ flag");
+            }
             return staticData_[n];
         } else {
             return dynamicData_->data[n];
@@ -108,7 +114,7 @@ struct my_opt_vector {
 private:
     size_t size_;
     bool isSmall_;
-    static const size_t MAX_STATIC_SIZE = 2;
+    static const size_t MAX_STATIC_SIZE = 8;
     union {
         dynamic_buffer<T>* dynamicData_;
         T staticData_[MAX_STATIC_SIZE];
