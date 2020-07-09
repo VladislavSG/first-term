@@ -296,29 +296,26 @@ big_integer operator>>(big_integer a, unsigned int b) {
     return a >>= b;
 }
 
-bool big_integer::vectorAbsSmaller(big_integer const& a, big_integer const& b) {
+int big_integer::vectorCmpThreeWay(big_integer const& a, big_integer const& b) {
     if (a.data_.size() != b.data_.size()) {
-        return a.data_.size() < b.data_.size();
+        return (a.data_.size() < b.data_.size() ? -1 : 1);
     } else {
         for (size_t i = a.data_.size(); i > 0; i--) {
             if (a.data_[i - 1] < b.data_[i - 1]) {
-                return true;
+                return -1;
+            } else if (a.data_[i - 1] > b.data_[i - 1]) {
+                return 1;
             }
         }
-        return false;
+        return 0;
     }
 }
 
 bool operator==(big_integer const& a, big_integer const& b) {
-    if (a.isPositive() != b.isPositive() || a.data_.size() != b.data_.size()) {
+    if (a.isPositive() != b.isPositive()) {
         return false;
     }
-    for (size_t i = a.data_.size(); i > 0; i--) {
-        if (a.data_[i - 1] != b.data_[i - 1]) {
-            return false;
-        }
-    }
-    return true;
+    return big_integer::vectorCmpThreeWay(a, b) == 0;
 }
 
 bool operator!=(big_integer const& a, big_integer const& b) {
@@ -329,10 +326,7 @@ bool operator<(big_integer const& a, big_integer const& b) {
     if (a.isPositive() != b.isPositive()) {
         return b.isPositive();
     }
-    if (a.data_.size() != b.data_.size()) {
-        return a.isPositive() == (a.data_.size() < b.data_.size());
-    }
-    return big_integer::vectorAbsSmaller(a, b);
+    return a.isPositive() == (big_integer::vectorCmpThreeWay(a, b) < 0);
 }
 
 bool operator>(big_integer const& a, big_integer const& b) {

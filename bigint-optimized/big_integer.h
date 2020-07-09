@@ -74,7 +74,7 @@ private:
 
     static uint32_t bitCount(uint32_t);
     static bool isPositive(uint32_t);
-    static bool vectorAbsSmaller(big_integer const&, big_integer const&);
+    static int vectorCmpThreeWay(big_integer const &a, big_integer const &b);
 };
 
 big_integer operator+(big_integer, big_integer const&);

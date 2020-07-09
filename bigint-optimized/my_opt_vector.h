@@ -7,35 +7,37 @@
 
 template <typename T>
 struct my_opt_vector {
-    my_opt_vector() : size_(0) {};
+    my_opt_vector() :
+                size_(0),
+                data_(operator new(sizeof(dynamic_t))) {};
 
-    my_opt_vector(my_opt_vector const& rhs) : size_(rhs.size_) {
+    my_opt_vector(my_opt_vector const& rhs) :
+                size_(rhs.size_),
+                data_(operator new(sizeof(dynamic_t))) {
         if (isSmall()) {
-            std::copy_n(rhs.staticData_, rhs.size_, staticData_);
+            std::copy_n(rhs.getStatic(), rhs.size_, getStatic());
         } else {
-            dynamicData_ = rhs.dynamicData_;
+            *changeToDynamic() = *rhs.getDynamic();
         }
     }
 
     ~my_opt_vector() {
         if (!isSmall()) {
-            dynamicData_.reset();
+            getDynamic()->~dynamic_t();
         }
+        operator delete(data_);
     }
 
     my_opt_vector& operator=(my_opt_vector const& other) {
-        if (this != &other) {
-            if (!isSmall(size_)) {
-                dynamicData_.reset();
-            }
-            size_ = other.size_;
-            if (other.isSmall()) {
-                std::copy_n(other.staticData_, other.size_, staticData_);
-            } else {
-                dynamicData_ = other.dynamicData_;
-            }
-        }
+        my_opt_vector temp(other);
+        swap(temp);
         return *this;
+    }
+
+    void swap(my_opt_vector& other) {
+        using std::swap;
+        swap(data_, other.data_);
+        swap(size_, other.size_);
     }
 
     size_t size() const {
@@ -63,18 +65,18 @@ struct my_opt_vector {
 
     T& operator[](size_t n) {
         if (isSmall()) {
-            return staticData_[n];
+            return getStatic()[n];
         } else {
             unshare();
-            return (*dynamicData_)[n];
+            return (**getDynamic())[n];
         }
     }
 
     T const& operator[](size_t n) const {
         if (isSmall()) {
-            return staticData_[n];
+            return getStatic()[n];
         } else {
-            return (*dynamicData_)[n];
+            return (**getDynamic())[n];
         }
     }
 
@@ -82,21 +84,22 @@ struct my_opt_vector {
         if (isSmall(newSize)) {
             if (isSmall()) {
                 if (newSize > size_) {
-                    std::fill(staticData_ + size_, staticData_ + newSize, 0);
+                    std::fill(getStatic() + size_, getStatic() + newSize, 0u);
                 }
             } else {
                 T buffer[MAX_STATIC_SIZE];
-                std::copy_n(dynamicData_->begin(), newSize, buffer);
-                dynamicData_.reset();
-                std::copy_n(buffer, newSize, staticData_);
+                std::copy_n((*getDynamic())->begin(), newSize, buffer);
+                changeToStatic();
+                std::copy_n(buffer, newSize, getStatic());
             }
         } else {
             if (isSmall()) {
                 auto* buffer = new std::vector<T>(newSize);
-                std::copy_n(staticData_, size_, buffer->begin());
-                dynamicData_.reset(buffer);
+                std::copy_n(getStatic(), size_, buffer->begin());
+                changeToDynamic(buffer);
             } else {
-                dynamicData_->resize(newSize);
+                unshare();
+                (*getDynamic())->resize(newSize);
             }
         }
         size_ = newSize;
@@ -106,10 +109,7 @@ private:
     typedef std::shared_ptr<std::vector<T>> dynamic_t;
     size_t size_;
     static const size_t MAX_STATIC_SIZE = sizeof(dynamic_t) / sizeof(T);
-    union {
-        dynamic_t dynamicData_;
-        T staticData_[MAX_STATIC_SIZE];
-    };
+    void* data_;
 
     static bool isSmall(size_t x) {
         return x <= MAX_STATIC_SIZE;
@@ -119,9 +119,29 @@ private:
         return isSmall(size_);
     }
 
+    dynamic_t* getDynamic() const {
+        return static_cast<dynamic_t*>(data_);
+    }
+
+    T* getStatic() const {
+        return static_cast<T*>(data_);
+    }
+
+    dynamic_t* changeToDynamic(std::vector<T>* ptr = nullptr) {
+        dynamic_t* dynamicPtr = getDynamic();
+        new(dynamicPtr) dynamic_t(ptr);
+        return dynamicPtr;
+    }
+
+    T* changeToStatic() {
+        dynamic_t* dynamicPtr = getDynamic();
+        dynamicPtr->~dynamic_t();
+        return getStatic();
+    }
+
     void unshare() {
-        if (!isSmall() && !dynamicData_.unique())
-            dynamicData_.reset(new std::vector<T>(*dynamicData_));
+        if (!isSmall() && !getDynamic()->unique())
+            getDynamic()->reset(new std::vector<T>(**getDynamic()));
     }
 };
 
