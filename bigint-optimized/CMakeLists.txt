@@ -15,7 +15,9 @@ add_executable(big_integer_testing
                big_integer_gmp.cpp 
                big_integer_gmp.h
                my_opt_vector.h
-               dynamic_buffer.h)
+               my_opt_vector.cpp
+               dynamic_buffer.h
+               dynamic_buffer.cpp)
 
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic")

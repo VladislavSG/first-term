@@ -6,133 +6,43 @@
 #include <algorithm>
 #include "dynamic_buffer.h"
 
-template <typename T>
 struct my_opt_vector {
-    my_opt_vector() :
-                size_(0),
-                isSmall_(true) {
-        staticData_[0] = 0;
-    };
+    my_opt_vector();
 
-    my_opt_vector(my_opt_vector const& rhs) :
-                size_(rhs.size_),
-                isSmall_(rhs.isSmall_) {
-        if (rhs.isSmall_) {
-            std::copy_n(rhs.staticData_, rhs.size_, staticData_);
-        } else {
-            dynamicData_ = rhs.dynamicData_->makeCopy();
-        }
-    }
+    my_opt_vector(my_opt_vector const& rhs);
 
-    ~my_opt_vector() {
-        if (!isSmall_) {
-            dynamicData_->reduceCounter();
-        }
-    }
+    ~my_opt_vector();
 
-    my_opt_vector& operator=(my_opt_vector const& other) {
-        if (this != &other) {
-            if (!isSmall_) {
-                dynamicData_->reduceCounter();
-            }
-            size_ = other.size_;
-            isSmall_ = other.isSmall_;
-            if (other.isSmall_) {
-                std::copy_n(other.staticData_, size_, staticData_);
-            } else {
-                dynamicData_ = other.dynamicData_->makeCopy();
-            }
-        }
-        return *this;
-    }
+    my_opt_vector& operator=(my_opt_vector const& other);
 
-    size_t size() const {
-        return size_;
-    }
+    size_t size() const;
 
-    void pop_back() {
-        unshare();
-        resize(size_ - 1);
-    }
+    void pop_back();
 
-    void push_back(T elem) {
-        unshare();
-        resize(size_ + 1);
-        back() = elem;
-    }
+    void push_back(uint32_t elem);
 
-    T& back() {
-        return operator[](size_ - 1);
-    }
+    uint32_t& back();
 
-    T const& back() const {
-        return operator[](size_ - 1);
-    }
+    uint32_t const& back() const;
 
-    T& operator[](size_t n) {
-        if (isSmall_) {
-            if (n > MAX_STATIC_SIZE) {
-                throw std::logic_error("invalid isSmall_ flag");
-            }
-            return staticData_[n];
-        } else {
-            unshare();
-            return dynamicData_->data[n];
-        }
-    }
+    uint32_t& operator[](size_t n);
 
-    T const& operator[](size_t n) const {
-        if (isSmall_) {
-            if (n > MAX_STATIC_SIZE) {
-                throw std::logic_error("invalid isSmall_ flag");
-            }
-            return staticData_[n];
-        } else {
-            return dynamicData_->data[n];
-        }
-    }
+    uint32_t const& operator[](size_t n) const;
 
-    void resize(size_t newSize) {
-        if (isSmall_) {
-            if (isSmall(newSize)) {
-                if (newSize > size_) {
-                    std::fill(staticData_ + size_, staticData_ + newSize, 0u);
-                }
-            } else {
-                dynamic_buffer<T>* newData = new dynamic_buffer<T>(newSize);
-                std::copy_n(staticData_, size_, newData->data.begin());
-                dynamicData_ = newData;
-                isSmall_ = false;
-            }
-        } else {
-            unshare();
-            dynamicData_->data.resize(newSize);
-        }
-        size_ = newSize;
-    }
+    void resize(size_t newSize);
 
 private:
     size_t size_;
     bool isSmall_;
-    static const size_t MAX_STATIC_SIZE = 8;
+    static constexpr size_t MAX_STATIC_SIZE = 8;
     union {
-        dynamic_buffer<T>* dynamicData_;
-        T staticData_[MAX_STATIC_SIZE];
+        dynamic_buffer* dynamicData_;
+        uint32_t staticData_[MAX_STATIC_SIZE];
     };
 
-    static bool isSmall(size_t x) {
-        return x <= MAX_STATIC_SIZE;
-    }
+    static bool isSmall(size_t x);
 
-    void unshare() {
-        if (!isSmall_ && !dynamicData_->unique()) {
-            dynamic_buffer<T>* newData = new dynamic_buffer<T>(dynamicData_->data);
-            dynamicData_->reduceCounter();
-            dynamicData_ = newData;
-        }
-    }
+    void unshare();
 };
-
-template struct my_opt_vector<uint32_t>;
 
 #endif //BIGINT_MY_OPT_VECTOR_H

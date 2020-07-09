@@ -5,7 +5,7 @@
 #include <functional>
 #include "my_opt_vector.h"
 
-using storage_t = my_opt_vector<uint32_t>;
+using storage_t = my_opt_vector;
 
 struct big_integer
 {
