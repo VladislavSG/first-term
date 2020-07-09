@@ -326,7 +326,10 @@ bool operator<(big_integer const& a, big_integer const& b) {
     if (a.isPositive() != b.isPositive()) {
         return b.isPositive();
     }
-    return a.isPositive() == (big_integer::vectorCmpThreeWay(a, b) < 0);
+    if (a.data_.size() != b.data_.size()) {
+        return a.isPositive() == (a.data_.size() < b.data_.size());
+    }
+    return big_integer::vectorCmpThreeWay(a, b) < 0;
 }
 
 bool operator>(big_integer const& a, big_integer const& b) {
