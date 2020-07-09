@@ -9,11 +9,11 @@ template <typename T>
 struct my_opt_vector {
     my_opt_vector() :
                 size_(0),
-                data_(operator new(sizeof(dynamic_t))) {};
+                data_(operator new(MAX_STATIC_SIZE * sizeof(uint32_t))) {};
 
     my_opt_vector(my_opt_vector const& rhs) :
                 size_(rhs.size_),
-                data_(operator new(sizeof(dynamic_t))) {
+                data_(operator new(MAX_STATIC_SIZE * sizeof(uint32_t))) {
         if (isSmall()) {
             std::copy_n(rhs.getStatic(), rhs.size_, getStatic());
         } else {
@@ -108,7 +108,7 @@ struct my_opt_vector {
 private:
     typedef std::shared_ptr<std::vector<T>> dynamic_t;
     size_t size_;
-    static const size_t MAX_STATIC_SIZE = sizeof(dynamic_t) / sizeof(T);
+    static const size_t MAX_STATIC_SIZE = sizeof(dynamic_t) / sizeof(T) + 8;
     void* data_;
 
     static bool isSmall(size_t x) {
