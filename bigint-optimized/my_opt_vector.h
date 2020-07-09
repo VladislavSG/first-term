@@ -26,14 +26,14 @@ struct my_opt_vector {
 
     ~my_opt_vector() {
         if (!isSmall_) {
-            dynamicData_->unshare();
+            dynamicData_->reduceCounter();
         }
     }
 
     my_opt_vector& operator=(my_opt_vector const& other) {
         if (this != &other) {
             if (!isSmall_) {
-                dynamicData_->unshare();
+                dynamicData_->reduceCounter();
             }
             size_ = other.size_;
             isSmall_ = other.isSmall_;
@@ -121,7 +121,7 @@ private:
     void unshare() {
         if (!isSmall_ && !dynamicData_->unique()) {
             dynamic_buffer<T>* newData = new dynamic_buffer<T>(dynamicData_->data);
-            dynamicData_->unshare();
+            dynamicData_->reduceCounter();
             dynamicData_ = newData;
         }
     }

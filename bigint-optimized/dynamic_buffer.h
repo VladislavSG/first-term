@@ -30,7 +30,7 @@ struct dynamic_buffer {
         return this;
     }
 
-    void unshare() {
+    void reduceCounter() {
         if (--ref_counter == 0) {
             delete this;
         }
