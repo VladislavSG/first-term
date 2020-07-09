@@ -16,10 +16,15 @@ struct my_opt_vector {
                 size_(rhs.size_),
                 data_(operator new(MAX_STATIC_SIZE * sizeof(uint32_t))),
                 isSmall_(rhs.isSmall_) {
-        if (isSmall_) {
+        if (rhs.isSmall_) {
             std::copy_n(rhs.getStatic(), rhs.size_, getStatic());
         } else {
-            *changeToDynamic() = *rhs.getDynamic();
+            if (isSmall(rhs.size_)) {
+                std::copy_n((*rhs.getDynamic())->begin(), rhs.size_, getStatic());
+                isSmall_ = true;
+            } else {
+                *changeToDynamic() = *rhs.getDynamic();
+            }
         }
     }
 
