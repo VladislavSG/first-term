@@ -10,9 +10,9 @@ struct dynamic_buffer {
 
     dynamic_buffer();
 
-    dynamic_buffer(size_t size);
+    explicit dynamic_buffer(size_t size);
 
-    dynamic_buffer(std::vector<uint32_t>& vec);
+    explicit dynamic_buffer(std::vector<uint32_t> const& vec);
 
     dynamic_buffer(dynamic_buffer const&) = delete;
     dynamic_buffer& operator=(dynamic_buffer const&) = delete;
