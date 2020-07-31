@@ -6,7 +6,7 @@ dynamic_buffer::dynamic_buffer(size_t size) :
         data(size),
         ref_counter(1) {}
 
-dynamic_buffer::dynamic_buffer(std::vector<uint32_t>& vec) :
+dynamic_buffer::dynamic_buffer(std::vector<uint32_t> const& vec) :
         data(vec),
         ref_counter(1) {}
 
