@@ -44,9 +44,6 @@ struct big_integer
     big_integer& inverseInPlace();
     big_integer& absInPlace();
 
-    big_integer& shiftedSubInPlace(big_integer const&, size_t);
-    big_integer& shiftedAddInPlace(big_integer const&, size_t);
-
     friend bool operator==(big_integer const&, big_integer const&);
     friend bool operator!=(big_integer const&, big_integer const&);
     friend bool operator<(big_integer const&, big_integer const&);
@@ -63,6 +60,8 @@ private:
     big_integer& shiftedAbstractInPlace(big_integer const &, size_t, uint32_t,
                             std::function<uint32_t(uint32_t)> const&, bool);
     big_integer& shiftedSubVectorInPlace(big_integer const&, size_t);
+    big_integer& shiftedSubInPlace(big_integer const&, size_t);
+    big_integer& shiftedAddInPlace(big_integer const&, size_t);
     big_integer& divAbsLongDigitInPlace(uint32_t x);
 
     big_integer& trim();
