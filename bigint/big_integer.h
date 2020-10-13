@@ -21,8 +21,6 @@ struct big_integer
     big_integer& operator/=(big_integer const&);
     big_integer& operator%=(big_integer const&);
 
-    big_integer& bit_operation(big_integer const&,
-            std::function<uint32_t(uint32_t, uint32_t)> const&);
     big_integer& operator&=(big_integer const&);
     big_integer& operator|=(big_integer const&);
     big_integer& operator^=(big_integer const&);
@@ -48,7 +46,6 @@ struct big_integer
 
     big_integer& shiftedSubInPlace(big_integer const&, size_t);
     big_integer& shiftedAddInPlace(big_integer const&, size_t);
-    big_integer& divAbsLongDigitInPlace(uint32_t x);
 
     friend bool operator==(big_integer const&, big_integer const&);
     friend bool operator!=(big_integer const&, big_integer const&);
@@ -66,10 +63,15 @@ private:
     big_integer& shiftedAbstractInPlace(big_integer const &, size_t, uint32_t,
                             std::function<uint32_t(uint32_t)> const&, bool);
     big_integer& shiftedSubVectorInPlace(big_integer const&, size_t);
+    big_integer& divAbsLongDigitInPlace(uint32_t x);
+
     big_integer& trim();
     void reserve(size_t);
     uint32_t getDigit(size_t) const;
     uint32_t getDigit(size_t, bool) const;
+
+    big_integer& bit_operation(big_integer const&,
+                               std::function<uint32_t(uint32_t, uint32_t)> const&);
 
     static uint32_t bitCount(uint32_t);
     static bool isPositive(uint32_t);
