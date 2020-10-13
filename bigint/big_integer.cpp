@@ -120,7 +120,7 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
         if (*this >= divisor) {
             uint32_t divisorBack;
             size_t divisorSize = divisor.data_.size();
-            if (divisor.data_.back()) {
+            if (divisor.data_.back() != 0) {
                 divisorBack = divisor.data_.back();
             } else {
                 divisorBack = divisor.data_[divisor.data_.size() - 2];
@@ -184,9 +184,9 @@ big_integer& big_integer::operator<<=(unsigned int rhs) {
     unsigned int digit_count = rhs / BIT_IN_DIGIT;
     unsigned int bit_count_l = rhs % BIT_IN_DIGIT;
     unsigned int bit_count_r =  BIT_IN_DIGIT - bit_count_l;
-    size_t new_size = data_.size() + digit_count + (bit_count_l ? 1 : 0);
+    size_t new_size = data_.size() + digit_count + (bit_count_l != 0 ? 1 : 0);
     reserve(new_size);
-    if (bit_count_l) {
+    if (bit_count_l != 0) {
         for (size_t i = new_size; i > digit_count + 1; --i) {
             data_[i - 1] = (getDigit(i - digit_count - 1) << bit_count_l) +
                            (getDigit(i - digit_count - 2) >> bit_count_r);
@@ -212,7 +212,7 @@ big_integer& big_integer::operator>>=(unsigned int rhs) {
     unsigned int bit_count_r = rhs % BIT_IN_DIGIT;
     unsigned int bit_count_l = BIT_IN_DIGIT - bit_count_r;
     size_t i = 0;
-    if (bit_count_r) {
+    if (bit_count_r != 0) {
         for (; i < digit_size - digit_count; ++i) {
             data_[i] = (getDigit(i + digit_count) >> bit_count_r) +
                        (getDigit(i + digit_count + 1) << bit_count_l);
@@ -360,9 +360,9 @@ std::string to_string(big_integer const& a) {
         s << "-";
     }
     s << buffer.back();
-    for (size_t i = buffer.size() - 1; i > 0; --i) {
+    for (auto i = buffer.rbegin() + 1; i != buffer.rend(); ++i) {
         char nine_chars[10];
-        sprintf(nine_chars, "%09d", buffer[i - 1]);
+        sprintf(nine_chars, "%09d", *i);
         s << nine_chars;
     }
     return s.str();
@@ -418,11 +418,7 @@ uint32_t big_integer::getDigit(size_t i, bool sign) const {
     if (i < data_.size()) {
         return data_[i];
     } else {
-        if (sign) {
-            return 0;
-        } else {
-            return UINT32_MAX;
-        }
+        return sign ? 0 : UINT32_MAX;
     }
 }
 
